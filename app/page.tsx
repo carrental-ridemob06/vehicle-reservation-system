@@ -1,8 +1,11 @@
-export default function HomePage() {
+// app/page.tsx
+
+export default function Page() {
+  console.log('🔵 ページがレンダリングされました！');
+
   return (
     <main>
-      <h1>Vehicle Reservation System</h1>
-      <p>API is ready. Try /api/checkAvailability</p>
+      <h1>Hello, world!</h1>
     </main>
   );
 }
