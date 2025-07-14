@@ -16,4 +16,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # OS
+<<<<<<< HEAD
 .DS_Store
+=======
+.DS_Store
+>>>>>>> 48ade4e9aee19c5c71549fa5a1199ecff65076fc
