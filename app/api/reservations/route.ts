@@ -1,19 +1,13 @@
 // app/api/reservations/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'  // ✅ 共通クライアントに置き換え
 import { getAccessToken } from '@/lib/googleAuth'
 
-// Supabase設定
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-// GoogleカレンダーIDを車両ごとに切り替える場合はこちらを使う
+// GoogleカレンダーIDを車両ごとに切り替えるマッピング
 const calendarMap: Record<string, string> = {
-  car01: process.env.NEXT_PUBLIC_CAR01_CALENDAR_ID!,
-  car02: process.env.NEXT_PUBLIC_CAR02_CALENDAR_ID!,
-  car03: process.env.NEXT_PUBLIC_CAR03_CALENDAR_ID!,
+  car01: process.env.NEXT_PUBLIC_CAR01_CALENDAR_ID || '',
+  car02: process.env.NEXT_PUBLIC_CAR02_CALENDAR_ID || '',
+  car03: process.env.NEXT_PUBLIC_CAR03_CALENDAR_ID || '',
 }
 
 export async function POST(req: NextRequest) {
@@ -21,12 +15,13 @@ export async function POST(req: NextRequest) {
     const { date, time, vehicle_id } = await req.json()
 
     // Supabaseへの保存
-    const { data, error } = await supabase.from('reservations').insert([
+    const { data, error } = await supabaseAdmin.from('reservations').insert([
       {
         vehicle_id,
         start_date: date,
         end_date: date,
         status: 'reserved',
+        created_at: new Date().toISOString(),
       },
     ])
 
@@ -35,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Google Calendarにも予約
+    // Google Calendar にも予約を登録
     const calendarId = calendarMap[vehicle_id] || calendarMap.car01
     const accessToken = await getAccessToken()
 
