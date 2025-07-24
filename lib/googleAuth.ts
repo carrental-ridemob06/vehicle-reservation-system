@@ -8,7 +8,7 @@ export async function getAccessToken() {
     },
     scopes: [
       'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/spreadsheets', // ✅ Sheets 書き込みに必要
+      'https://www.googleapis.com/auth/spreadsheets',
     ],
   })
 

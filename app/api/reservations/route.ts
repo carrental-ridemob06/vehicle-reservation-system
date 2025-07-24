@@ -1,9 +1,7 @@
-// app/api/reservations/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../lib/supabaseAdmin'  // ✅ 共通クライアントに置き換え
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { getAccessToken } from '@/lib/googleAuth'
 
-// GoogleカレンダーIDを車両ごとに切り替えるマッピング
 const calendarMap: Record<string, string> = {
   car01: process.env.NEXT_PUBLIC_CAR01_CALENDAR_ID || '',
   car02: process.env.NEXT_PUBLIC_CAR02_CALENDAR_ID || '',
@@ -13,8 +11,8 @@ const calendarMap: Record<string, string> = {
 export async function POST(req: NextRequest) {
   try {
     const { date, time, vehicle_id } = await req.json()
+    console.log('📥 リクエスト:', { date, time, vehicle_id })
 
-    // Supabaseへの保存
     const { data, error } = await supabaseAdmin.from('reservations').insert([
       {
         vehicle_id,
@@ -30,7 +28,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Google Calendar にも予約を登録
     const calendarId = calendarMap[vehicle_id] || calendarMap.car01
     const accessToken = await getAccessToken()
 
@@ -58,13 +55,14 @@ export async function POST(req: NextRequest) {
     )
 
     const eventJson = await eventRes.json()
+    console.log('📅 カレンダー登録結果:', eventJson)
+
     if (!eventRes.ok) {
       console.error('❌ Google Calendar error:', eventJson)
       return NextResponse.json({ error: 'カレンダー登録に失敗しました' }, { status: 500 })
     }
 
     return NextResponse.json({ result: 'success', data })
-
   } catch (err) {
     console.error('❌ Unknown error:', err)
     return NextResponse.json({ error: 'サーバーエラー' }, { status: 500 })

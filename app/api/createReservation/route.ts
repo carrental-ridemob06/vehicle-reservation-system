@@ -6,10 +6,10 @@ import { createClient } from '@supabase/supabase-js'
 export async function POST(req: NextRequest) {
   try {
     const { userId, vehicleId, calendarId, startDate, endDate } = await req.json()
-    console.log('💡 Request Body:', { userId, vehicleId, calendarId, startDate, endDate })
+    console.log('📥 Request Body:', { userId, vehicleId, calendarId, startDate, endDate })
 
     // ============================
-    // Google 認証
+    // 🔐 Google 認証
     // ============================
     const { google } = require('googleapis')
     const auth = new google.auth.GoogleAuth({
@@ -27,8 +27,9 @@ export async function POST(req: NextRequest) {
     const calendar = google.calendar({ version: 'v3', auth })
 
     // ============================
-    // FreeBusy チェック
+    // 📆 FreeBusy チェック
     // ============================
+    console.log('🔎 Checking FreeBusy...')
     const freebusy = await calendar.freebusy.query({
       requestBody: {
         timeMin: `${startDate}T00:00:00Z`,
@@ -37,10 +38,11 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log('✅ FreeBusy:', JSON.stringify(freebusy.data, null, 2))
+    console.log('✅ FreeBusy result:', JSON.stringify(freebusy.data, null, 2))
 
     const busy = freebusy.data.calendars?.[calendarId]?.busy || []
     if (busy.length > 0) {
+      console.warn('⚠️ Busy time slot:', busy)
       return NextResponse.json(
         { error: 'Time slot is not available', busy },
         { status: 409 }
@@ -48,8 +50,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================
-    // Google Calendar に予定作成
+    // 📅 Google Calendar に予定作成
     // ============================
+    console.log('📝 Creating event on Google Calendar...')
     const eventRes = await calendar.events.insert({
       calendarId,
       requestBody: {
@@ -63,16 +66,18 @@ export async function POST(req: NextRequest) {
     console.log('✅ Created Calendar Event ID:', calendarEventId)
 
     // ============================
-    // Supabase Insert（サービスロールキー使用）
+    // 🛠 Supabase Insert
     // ============================
-    console.log('💡 SUPABASE_URL:', process.env.SUPABASE_URL)
-    console.log('💡 SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY)
+    console.log('💡 Connecting Supabase...')
+    console.log('🛠 SUPABASE_URL:', process.env.SUPABASE_URL)
+    console.log('🛠 SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY)
 
     const supabase = createClient(
       process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! // ← サービスロールでRLSをバイパス
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    console.log('📦 Inserting reservation into Supabase...')
     const { data: insertData, error: insertError } = await supabase
       .from('carrental')
       .insert([{
@@ -86,14 +91,13 @@ export async function POST(req: NextRequest) {
       }])
       .select()
 
-    console.log('✅ Supabase Insert Data:', insertData)
     if (insertError || !insertData || insertData.length === 0) {
       console.error('❌ Supabase Insert Error:', insertError)
 
-      // ロールバック：カレンダーから削除
+      // ロールバック：Google カレンダー削除
       try {
         await calendar.events.delete({ calendarId, eventId: calendarEventId })
-        console.log('✅ Calendar rollback success')
+        console.log('♻️ Calendar rollback success')
       } catch (err) {
         console.error('❌ Calendar rollback failed:', err)
       }
@@ -101,10 +105,13 @@ export async function POST(req: NextRequest) {
       throw insertError ?? new Error('Supabase insert returned no data.')
     }
 
+    console.log('✅ Supabase Insert Data:', insertData)
+
     // ============================
-    // Google Sheets に行追加
+    // 🧾 Google Sheets に行追加
     // ============================
     const sheets = google.sheets({ version: 'v4', auth })
+    console.log('🧾 Appending to Google Sheets...')
 
     try {
       await sheets.spreadsheets.values.append({
@@ -129,16 +136,16 @@ export async function POST(req: NextRequest) {
     } catch (sheetsErr) {
       console.error('❌ Sheets Append Error:', sheetsErr)
 
-      // ロールバック：カレンダー & Supabase
+      // ロールバック：GoogleカレンダーとSupabase
       try {
         await calendar.events.delete({ calendarId, eventId: calendarEventId })
-        console.log('✅ Calendar rollback success')
+        console.log('♻️ Calendar rollback success')
       } catch (err) {
         console.error('❌ Calendar rollback failed:', err)
       }
       try {
         await supabase.from('carrental').delete().eq('id', insertData[0].id)
-        console.log('✅ Supabase rollback success')
+        console.log('♻️ Supabase rollback success')
       } catch (err) {
         console.error('❌ Supabase rollback failed:', err)
       }
@@ -147,13 +154,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================
-    // 成功レスポンス
+    // ✅ 成功レスポンス
     // ============================
+    console.log('🎉 Reservation created successfully!')
     return NextResponse.json({
       message: 'Reservation created successfully!',
       calendarEventId,
       reservationId: insertData[0].id,
     })
+
   } catch (error) {
     console.error('❌ createReservation error:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
