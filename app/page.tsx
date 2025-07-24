@@ -1,11 +1,10 @@
 // app/page.tsx
+import CalendarUi from './components/CalendarUi'
 
-export default function Page() {
-  console.log('🔵 ページがレンダリングされました！');
-
+export default function HomePage() {
   return (
     <main>
-      <h1>Hello, world!</h1>
+      <CalendarUi />
     </main>
-  );
+  )
 }

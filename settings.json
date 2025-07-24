@@ -1,0 +1,22 @@
+{
+  // 🌿 エディタ共通設定
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "files.autoSave": "onFocusChange",
+
+  // 🌀 Tailwind CSS IntelliSense が効くように
+  "tailwindCSS.includeLanguages": {
+    "plaintext": "html",
+    "html": "html",
+    "css": "css",
+    "javascript": "javascript",
+    "typescript": "typescript",
+    "typescriptreact": "typescriptreact"
+  },
+
+  // ✨ Tailwind 設定ファイルの場所を明示する
+  "tailwindCSS.experimental.configFile": "tailwind.config.js",
+
+  // ✔️ ワークスペースに Prettier を使っている場合
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
+}
