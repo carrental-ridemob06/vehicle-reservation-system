@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAccessToken } from '@/lib/googleAuth' // パスは環境に合わせて調整
+import { getAccessToken } from '@/lib/googleAuth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       car03: process.env.NEXT_PUBLIC_CAR03_CALENDAR_ID ?? '',
     }
 
-    console.log('📦 環境変数からのカレンダーIDマップ:', calendarMap)
+    console.log('📦 カレンダーIDマップ:', calendarMap)
 
     const calendarId = calendarMap[vehicleId]
 
@@ -29,9 +29,17 @@ export async function POST(req: NextRequest) {
 
     console.log('📅 使用するカレンダーID:', calendarId)
 
-    // 🔐 Googleアクセストークン取得
+    // 🔐 Google アクセストークン取得
     const accessToken = await getAccessToken()
-    console.log('🔑 アクセストークン取得成功:', accessToken ? 'Yes' : 'No')
+    if (!accessToken) {
+      console.error('❌ アクセストークン取得失敗')
+      return NextResponse.json(
+        { message: 'アクセストークンの取得に失敗しました' },
+        { status: 500 }
+      )
+    }
+
+    console.log('🔑 アクセストークン取得成功')
 
     // 📡 Google Calendar FreeBusy API 呼び出し
     const freeBusyRes = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
@@ -52,7 +60,7 @@ export async function POST(req: NextRequest) {
     console.log('📝 FreeBusy API 応答:', JSON.stringify(freeBusyData, null, 2))
 
     if (!freeBusyData.calendars || !freeBusyData.calendars[calendarId]) {
-      console.error('⚠️ FreeBusy応答にカレンダー情報が含まれていません:', freeBusyData)
+      console.error('⚠️ カレンダー情報が応答に含まれていません:', freeBusyData)
       return NextResponse.json(
         { message: 'Google API応答にカレンダー情報が見つかりません' },
         { status: 500 }
@@ -60,17 +68,17 @@ export async function POST(req: NextRequest) {
     }
 
     const busySlots = freeBusyData.calendars[calendarId].busy || []
-    console.log('📆 Busy時間帯:', busySlots)
+    console.log('📆 忙しい時間帯:', busySlots)
 
     if (busySlots.length > 0) {
-      console.warn('🚫 すでに予約済みの時間帯があります')
+      console.warn('🚫 忙しい時間帯が存在するため予約不可')
       return NextResponse.json(
         { message: '指定期間はすでに予約されています。', busy: busySlots },
         { status: 409 }
       )
     }
 
-    console.log('✅ 空きあり → 予約可能です')
+    console.log('✅ 空きあり → 予約可能')
     return NextResponse.json({ ok: true })
 
   } catch (error) {
