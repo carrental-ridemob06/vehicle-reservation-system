@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 
+// GET: carrental テーブルから1件取得
 export async function GET(req: NextRequest) {
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!
-  );
-
   const { data, error } = await supabase
-    .from('carrental') // ← ここを carrental に！
+    .from('carrental')
     .select('*')
-    .limit(1);
+    .limit(1)
 
-  console.log('Supabase test:', data, error);
+  console.log('Supabase test:', data, error)
 
-  return NextResponse.json({ data, error });
+  return NextResponse.json({ data, error })
 }
 
+// POST: carrental テーブルに1件挿入（テスト用データ）
 export async function POST(req: NextRequest) {
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!
-  );
-
   const { data, error } = await supabase
-    .from('carrental') // ← ここも carrental に！
+    .from('carrental')
     .insert([
       {
         user_id: 'test-user-id',
@@ -35,9 +27,9 @@ export async function POST(req: NextRequest) {
         status: 'confirmed',
         created_at: new Date().toISOString(),
       },
-    ]);
+    ])
 
-  console.log('Supabase insert:', data, error);
+  console.log('Supabase insert:', data, error)
 
-  return NextResponse.json({ data, error });
+  return NextResponse.json({ data, error })
 }

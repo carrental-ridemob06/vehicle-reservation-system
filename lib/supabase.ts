@@ -2,8 +2,15 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-// 型は自動生成した場合は import するけど、今は any でOK
-export const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-)
+const supabaseUrl = process.env.SUPABASE_URL || ''
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || ''
+
+if (!supabaseUrl) {
+  throw new Error('❌ SUPABASE_URL is not defined')
+}
+
+if (!supabaseAnonKey) {
+  throw new Error('❌ SUPABASE_ANON_KEY is not defined')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
