@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccessToken } from '../../../lib/googleAuth'
-import { supabase } from '../../../lib/supabase' // ✅ 共通クライアント
+import { supabase } from '../../../lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,10 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const calendarId = calendarMap[vehicleId]
-    console.log('🗂️ 使用する calendarId:', calendarId)
-
     const accessToken = await getAccessToken()
-    console.log('🔑 GOOGLE AccessToken:', accessToken)
 
     const eventRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
@@ -38,9 +35,13 @@ export async function POST(req: NextRequest) {
     )
 
     const eventData = await eventRes.json()
-    console.log('📜 Google Calendar Event Created:', JSON.stringify(eventData, null, 2))
-
     const calendarEventId = eventData.id
+
+    // ✨ 泊数から plan_id を自動生成
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const durationDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    const planId = `${durationDays}泊`
 
     const { data, error } = await supabase
       .from('carrental')
@@ -51,22 +52,19 @@ export async function POST(req: NextRequest) {
           calendar_event_id: calendarEventId,
           start_date: startDate,
           end_date: endDate,
+          plan_id: planId,
           status: 'confirmed',
         },
       ])
       .select()
 
     if (error || !data || data.length === 0) {
-      console.error('🚫 Supabase Insert Error:', JSON.stringify(error, null, 2))
       return NextResponse.json({ message: 'DB保存に失敗しました' }, { status: 500 })
     }
 
     const reservationId = data[0].id
-    console.log('✅ Supabase Reservation ID:', reservationId)
 
     if (process.env.GOOGLE_SHEETS_ID) {
-      console.log('🟢 Sheets書き込みを開始します...')
-
       const sheetsURL = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEETS_ID}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED`
 
       const sheetPayload = {
@@ -78,7 +76,7 @@ export async function POST(req: NextRequest) {
             calendarEventId,
             startDate,
             endDate,
-            '',
+            planId,
             'confirmed',
             new Date().toISOString(),
           ],
@@ -94,11 +92,8 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify(sheetPayload),
       })
 
-      const sheetsData = await sheetsRes.json()
-
-      if (sheetsRes.ok) {
-        console.log('✅ Sheets Append 成功:', JSON.stringify(sheetsData, null, 2))
-      } else {
+      if (!sheetsRes.ok) {
+        const sheetsData = await sheetsRes.json()
         console.error('🚫 Sheets Append エラー:', sheetsRes.status, sheetsRes.statusText)
         console.error('📄 エラー内容:', JSON.stringify(sheetsData, null, 2))
       }
