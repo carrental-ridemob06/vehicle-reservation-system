@@ -3,7 +3,11 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
-export default function CalendarUi() {
+type Props = {
+  userId: string
+}
+
+export default function CalendarUi({ userId }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -49,7 +53,12 @@ export default function CalendarUi() {
       return
     }
 
-    const payload = { vehicleId, startDate, endDate }
+    const payload = {
+      userId,         // ✅ 追加
+      vehicleId,
+      startDate,
+      endDate,
+    }
 
     try {
       const res = await fetch('/api/check-availability', {

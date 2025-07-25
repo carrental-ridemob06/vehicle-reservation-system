@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
     }
 
     const calendarId = calendarMap[vehicleId]
-    console.log('🗂️ 使用する calendarId:', calendarId)
+    if (!calendarId) {
+      return NextResponse.json({ message: '無効な車両IDです' }, { status: 400 })
+    }
 
     const accessToken = await getAccessToken()
     console.log('🔑 GOOGLE AccessToken:', accessToken)
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest) {
           calendar_event_id: calendarEventId,
           start_date: startDate,
           end_date: endDate,
-          planId: `${days}泊`,
+          planid: `${days}泊`,
           status: 'confirmed',
         },
       ])
