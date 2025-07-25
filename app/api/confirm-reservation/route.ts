@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccessToken } from '../../../lib/googleAuth'
-import { supabase } from '../../../lib/supabase' // ✅ 共通クライアント
+import { supabase } from '../../../lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { vehicleId, startDate, endDate } = body
+    const { userId, vehicleId, startDate, endDate } = body
 
-    console.log('🔵 Confirm API Called:', { vehicleId, startDate, endDate })
+    console.log('🔵 Confirm API Called:', { userId, vehicleId, startDate, endDate })
 
     const calendarMap: Record<string, string> = {
       car01: process.env.CAR01_CALENDAR_ID!,
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const accessToken = await getAccessToken()
     console.log('🔑 GOOGLE AccessToken:', accessToken)
 
-    // ✅ Googleカレンダーにイベントを作成
+    // ✅ Googleカレンダーにイベント作成
     const eventRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
       {
@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
 
     const eventData = await eventRes.json()
 
-    // ✅ Google Calendar イベント作成失敗チェック
     if (!eventRes.ok || !eventData.id) {
       console.error('🚫 Google Calendar イベント作成失敗:', eventRes.status, eventData)
       return NextResponse.json(
@@ -52,18 +51,17 @@ export async function POST(req: NextRequest) {
     const calendarEventId = eventData.id
     console.log('📜 Google Calendar Event Created:', calendarEventId)
 
-    // ✅ 泊数（end - start）を計算
     const days =
       Math.ceil(
         (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
-      ) || 1 // 念のため1泊保障
+      ) || 1
 
     // ✅ Supabaseに挿入
     const { data, error } = await supabase
       .from('carrental')
       .insert([
         {
-          user_id: 'test-user-001',
+          user_id: userId,
           vehicle_id: vehicleId,
           calendar_event_id: calendarEventId,
           start_date: startDate,
@@ -82,7 +80,7 @@ export async function POST(req: NextRequest) {
     const reservationId = data[0].id
     console.log('✅ Supabase Reservation ID:', reservationId)
 
-    // ✅ Google Sheetsに追記
+    // ✅ Google Sheetsへも書き込み
     if (process.env.GOOGLE_SHEETS_ID) {
       console.log('🟢 Sheets書き込みを開始します...')
 
@@ -92,7 +90,7 @@ export async function POST(req: NextRequest) {
         values: [
           [
             reservationId,
-            'test-user-001',
+            userId,
             vehicleId,
             calendarEventId,
             startDate,
