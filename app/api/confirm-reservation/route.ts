@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getAccessToken } from '../../../lib/googleAuth'
-
-// Supabase クライアント
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_ANON_KEY!
-)
+import { supabase } from '../../../lib/supabase' // ✅ 共通クライアント
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,13 +14,13 @@ export async function POST(req: NextRequest) {
       car02: process.env.CAR02_CALENDAR_ID!,
       car03: process.env.CAR03_CALENDAR_ID!,
     }
+
     const calendarId = calendarMap[vehicleId]
     console.log('🗂️ 使用する calendarId:', calendarId)
 
     const accessToken = await getAccessToken()
     console.log('🔑 GOOGLE AccessToken:', accessToken)
 
-    // Google Calendar イベント作成
     const eventRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
       {
@@ -48,7 +42,6 @@ export async function POST(req: NextRequest) {
 
     const calendarEventId = eventData.id
 
-    // Supabaseに保存
     const { data, error } = await supabase
       .from('carrental')
       .insert([
@@ -71,7 +64,6 @@ export async function POST(req: NextRequest) {
     const reservationId = data[0].id
     console.log('✅ Supabase Reservation ID:', reservationId)
 
-    // Google Sheets に追記
     if (process.env.GOOGLE_SHEETS_ID) {
       console.log('🟢 Sheets書き込みを開始します...')
 
@@ -86,7 +78,7 @@ export async function POST(req: NextRequest) {
             calendarEventId,
             startDate,
             endDate,
-            '', // plan_idなし
+            '',
             'confirmed',
             new Date().toISOString(),
           ],
