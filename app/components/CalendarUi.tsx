@@ -1,13 +1,15 @@
 'use client'
 
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
-export default function CalendarUi() {
+type Props = {
+  userId: string
+}
+
+export default function CalendarUi({ userId }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
-
-  const userId = searchParams.get('user') ?? 'test-user-001'
 
   const defaultVehicleId = searchParams.get('vehicle_id') ?? 'car01'
   const [vehicleId, setVehicleId] = useState(defaultVehicleId)
@@ -52,13 +54,15 @@ export default function CalendarUi() {
     }
 
     const payload = {
-      userId,       // ✅ ここで明示的に送信
+      userId,
       vehicleId,
       startDate,
       endDate,
     }
 
     try {
+      console.log('🟡 Check Availability Payload:', payload)
+
       const res = await fetch('/api/check-availability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +70,8 @@ export default function CalendarUi() {
       })
 
       const data = await res.json()
-      console.log('✅ Check Availability Response:', data)
+      console.log('🟢 Check Availability Response:', data)
+      console.log('🧾 HTTP Status:', res.status)
 
       if (!res.ok) {
         alert(`❌ 予約不可: ${data.message}`)
@@ -75,6 +80,8 @@ export default function CalendarUi() {
 
       alert('✅ 空きあり！ 予約確定します')
 
+      console.log('🟣 Confirm Reservation 開始')
+
       const confirmRes = await fetch('/api/confirm-reservation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,7 +89,8 @@ export default function CalendarUi() {
       })
 
       const confirmData = await confirmRes.json()
-      console.log('✅ Confirm Reservation Response:', confirmData)
+      console.log('🟢 Confirm Reservation Response:', confirmData)
+      console.log('🧾 HTTP Status:', confirmRes.status)
 
       if (confirmRes.ok) {
         alert(`✅ 予約が確定しました！\n予約ID: ${confirmData.reservation_id}`)

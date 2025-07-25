@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
           calendar_event_id: calendarEventId,
           start_date: startDate,
           end_date: endDate,
-          planid: `${days}泊`,
+          planId: `${days}泊`,
           status: 'confirmed',
         },
       ])
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const reservationId = data[0].id
     console.log('✅ Supabase Reservation ID:', reservationId)
 
-    // ✅ Google Sheetsへも書き込み
+    // ✅ Google Sheetsへ書き込み（任意）
     if (process.env.GOOGLE_SHEETS_ID) {
       console.log('🟢 Sheets書き込みを開始します...')
 
@@ -121,6 +121,8 @@ export async function POST(req: NextRequest) {
         console.error('🚫 Sheets Append エラー:', sheetsRes.status, sheetsRes.statusText)
         console.error('📄 エラー内容:', JSON.stringify(sheetsData, null, 2))
       }
+    } else {
+      console.log('⚠️ Sheets IDが未設定のため、スキップしました')
     }
 
     return NextResponse.json({
