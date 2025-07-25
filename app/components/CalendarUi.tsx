@@ -3,13 +3,11 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
-type Props = {
-  userId: string
-}
-
-export default function CalendarUi({ userId }: Props) {
+export default function CalendarUi() {
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const userId = searchParams.get('user') ?? 'test-user-001'
 
   const defaultVehicleId = searchParams.get('vehicle_id') ?? 'car01'
   const [vehicleId, setVehicleId] = useState(defaultVehicleId)
@@ -40,7 +38,7 @@ export default function CalendarUi({ userId }: Props) {
   const handleVehicleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value
     setVehicleId(newId)
-    router.replace(`?vehicle_id=${newId}`)
+    router.replace(`?user=${userId}&vehicle_id=${newId}`)
   }
 
   const handleReserve = async () => {
@@ -54,7 +52,7 @@ export default function CalendarUi({ userId }: Props) {
     }
 
     const payload = {
-      userId,         // ✅ 追加
+      userId,       // ✅ ここで明示的に送信
       vehicleId,
       startDate,
       endDate,
