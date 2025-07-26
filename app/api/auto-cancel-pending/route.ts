@@ -87,3 +87,5 @@ export async function GET() {
     return NextResponse.json({ message: '🔥 20分キャンセルAPIエラー', error: err.message }, { status: 500 })
   }
 }
+
+
