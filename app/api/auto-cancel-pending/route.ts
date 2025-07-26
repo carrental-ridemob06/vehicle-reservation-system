@@ -26,7 +26,7 @@ export async function GET() {
       return NextResponse.json({ message: 'キャンセル対象なし', count: 0 })
     }
 
-    console.log(`⚠️ ${pendingReservations.length}件の予約をキャンセルします`)
+    console.log(`⚠️ ${pendingReservations.length} 件の予約をキャンセルします`)
 
     // ✅ Googleカレンダー削除用の認証
     const token = await getAccessToken()
@@ -54,7 +54,7 @@ export async function GET() {
         // ✅ Supabaseのステータスを canceled に更新
         await supabase
           .from('carrental')
-          .update({ status: 'canceled' })
+          .update({ status: 'canceled', payment_status: 'expired' })
           .eq('id', id)
 
         console.log(`🛑 予約ID ${id} をキャンセルしました`)
@@ -64,7 +64,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      message: `${pendingReservations.length}件の予約をキャンセルしました`,
+      message: `${pendingReservations.length} 件の予約をキャンセルしました`,
       count: pendingReservations.length,
     })
   } catch (err) {

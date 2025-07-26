@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/auto-cancel-pending",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
