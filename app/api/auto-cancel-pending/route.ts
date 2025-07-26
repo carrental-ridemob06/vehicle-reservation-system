@@ -9,11 +9,14 @@ export async function GET() {
     // ✅ 今から20分前の時刻を計算
     const cutoffTime = new Date(Date.now() - 20 * 60 * 1000).toISOString()
 
-    // ✅ 20分以上経過した pending の予約を取得
+    // ✅ キャンセル対象ステータス（今後増えてもここを編集すればOK）
+    const CANCEL_TARGET_STATUS = ['pending', 'unpaid']
+
+    // ✅ 20分以上経過した予約を取得（pending / unpaid 両方）
     const { data: pendingReservations, error } = await supabase
       .from('carrental')
       .select('id, vehicle_id, calendar_event_id, created_at')
-      .eq('status', 'pending')
+      .in('status', CANCEL_TARGET_STATUS)  // ← ✅ ここを eq から in に変更
       .lt('created_at', cutoffTime)
 
     if (error) {
@@ -87,5 +90,3 @@ export async function GET() {
     return NextResponse.json({ message: '🔥 20分キャンセルAPIエラー', error: err.message }, { status: 500 })
   }
 }
-
-
