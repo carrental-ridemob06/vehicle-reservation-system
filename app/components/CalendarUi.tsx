@@ -126,9 +126,9 @@ export default function CalendarUi({ userId }: Props) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-100 to-indigo-100 px-4">
       <main className="w-full max-w-2xl mx-auto px-6 py-10 bg-white rounded-2xl shadow-xl border border-gray-200">
-        <h1 className="text-3xl font-extrabold text-center text-blue-800 mb-8">
-          🚆 乗り物予約カレンダー
-        </h1>
+        <h2 className="text-3xl font-extrabold text-center text-blue-800 mb-8">
+          🚙予約システム
+        </h2>
 
         {/* 🚗 ドロップダウン */}
         <VehicleSelect vehicleId={vehicleId} onChange={handleVehicleChange} />
@@ -150,7 +150,7 @@ export default function CalendarUi({ userId }: Props) {
           )}
         </div>
 
-        {/* 📆 日付入力 */}
+       {/* 📆 日付入力 */}
 <div style={{
   marginBottom: '24px',
   width: '100%',
@@ -158,15 +158,27 @@ export default function CalendarUi({ userId }: Props) {
 }}>
   <div style={{
     display: 'flex',
-    flexWrap: 'wrap',              // ✅ 狭い画面で折り返し
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     gap: '12px',
     marginBottom: '20px',
     width: '100%',
     boxSizing: 'border-box'
   }}>
+    {/* 🚗 未選択時メッセージ */}
+    {vehicleId === '' && (
+      <p style={{
+        color: 'red',
+        fontWeight: '700',
+        fontSize: '16px',
+        marginBottom: '8px',
+        textAlign: 'center'
+      }}>
+        🚗 まず車両を選択してください
+      </p>
+    )}
+
     {/* ✅ 開始日 */}
-    <div style={{ flex: '1 1 160px', minWidth: '160px' }}>
+    <div style={{ width: '100%' }}>
       <label
         style={{
           display: 'block',
@@ -181,7 +193,6 @@ export default function CalendarUi({ userId }: Props) {
       <input
         type="date"
         value={startDate}
-        disabled={!vehicleId}   
         onChange={(e) => setStartDate(e.target.value)}
         style={{
           width: '100%',
@@ -190,15 +201,15 @@ export default function CalendarUi({ userId }: Props) {
           border: '2px solid #999',
           borderRadius: '10px',
           boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-          backgroundColor: !vehicleId ? '#f3f3f3' : '#fff',
-          cursor: !vehicleId ? 'not-allowed' : 'text',
+          backgroundColor: '#fff',
           boxSizing: 'border-box'
         }}
+        disabled={vehicleId === ''}  // ✅ 車両未選択なら入力できないように
       />
     </div>
 
     {/* ✅ 終了日 */}
-    <div style={{ flex: '1 1 160px', minWidth: '160px' }}>
+    <div style={{ width: '100%' }}>
       <label
         style={{
           display: 'block',
@@ -213,7 +224,6 @@ export default function CalendarUi({ userId }: Props) {
       <input
         type="date"
         value={endDate}
-        disabled={!vehicleId}   
         onChange={(e) => setEndDate(e.target.value)}
         style={{
           width: '100%',
@@ -222,74 +232,80 @@ export default function CalendarUi({ userId }: Props) {
           border: '2px solid #999',
           borderRadius: '10px',
           boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-          backgroundColor: !vehicleId ? '#f3f3f3' : '#fff',
-          cursor: !vehicleId ? 'not-allowed' : 'text',
+          backgroundColor: '#fff',
           boxSizing: 'border-box'
         }}
+        disabled={vehicleId === ''}  // ✅ 車両未選択なら入力できないように
       />
     </div>
   </div>
 
+  {/* 🌙 泊数 + 予約ボタン */}
+<div style={{
+  display: 'flex',
+  flexDirection: 'column',   // ✅ 縦並びに変更
+  alignItems: 'center',
+  marginTop: '20px',
+  gap: '12px'
+}}>
+  {/* ✅ 泊数表示 */}
+  <div style={{
+    fontSize: '18px',
+    fontWeight: '600',
+    padding: '10px 16px',
+    border: '2px solid #ccc',
+    borderRadius: '8px',
+    backgroundColor: '#f9f9f9',
+    minWidth: '120px',
+    textAlign: 'center'
+  }}>
+    泊数: {nights} 泊
+  </div>
 
-          {/* 🌙 泊数 + 予約ボタン */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-            <div style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              padding: '10px 16px',
-              border: '2px solid #ccc',
-              borderRadius: '8px',
-              backgroundColor: '#f9f9f9',
-              flex: '0 0 auto',
-              minWidth: '120px',
-              textAlign: 'center'
-            }}>
-              泊数: {nights} 泊
-            </div>
-
-            <div style={{ flex: 1, textAlign: 'right' }}>
-              {userId && userId.trim() !== '' ? (
-                <button
-                  onClick={handleReserve}
-                  disabled={!vehicleId}  // ✅ 車未選択なら押せない
-                  style={{
-                    padding: '14px 24px',
-                    fontSize: '18px',
-                    fontWeight: '700',
-                    border: '2px solid #007BFF',
-                    borderRadius: '10px',
-                    backgroundColor: !vehicleId ? '#ccc' : '#007BFF',
-                    color: '#fff',
-                    cursor: !vehicleId ? 'not-allowed' : 'pointer',
-                    width: '100%',
-                    maxWidth: '280px'
-                  }}
-                >
-                  🚆 この車を予約する
-                </button>
-              ) : (
-                <button
-                  disabled
-                  style={{
-                    padding: '14px 24px',
-                    fontSize: '18px',
-                    fontWeight: '700',
-                    border: '2px solid #aaa',
-                    borderRadius: '10px',
-                    backgroundColor: '#ddd',
-                    color: '#666',
-                    width: '100%',
-                    maxWidth: '280px',
-                    cursor: 'not-allowed'
-                  }}
-                >
-                  🚆 この車を予約する
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
+  {/* ✅ userId があるかでボタン切替 */}
+  {userId && userId.trim() !== '' ? (
+    <button
+      onClick={handleReserve}
+      style={{
+        padding: '14px 24px',
+        fontSize: '18px',
+        fontWeight: '700',
+        border: '2px solid #007BFF',
+        borderRadius: '10px',
+        backgroundColor: vehicleId === '' ? '#ccc' : '#007BFF',
+        color: '#fff',
+        cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        width: '100%',
+        maxWidth: '280px',
+        display: 'inline-block'
+      }}
+      disabled={vehicleId === ''}
+    >
+      🚆 この車を予約する
+    </button>
+  ) : (
+    <button
+      disabled
+      style={{
+        padding: '14px 24px',
+        fontSize: '18px',
+        fontWeight: '700',
+        border: '2px solid #aaa',
+        borderRadius: '10px',
+        backgroundColor: '#ddd',
+        color: '#666',
+        width: '100%',
+        maxWidth: '280px',
+        display: 'inline-block',
+        cursor: 'not-allowed'
+      }}
+    >
+      🚆 この車を予約する
+    </button>
+      )}
     </div>
-  )
+  </div> </main> </div>
+
+ )     
 }
