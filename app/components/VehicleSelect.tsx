@@ -23,7 +23,7 @@ export default function VehicleSelect({ vehicleId, onChange }: Props) {
         }}
       >
         {/* ✅ 先頭 option */}
-        <option value="">こちらから車両を選択してください</option>
+        <option value="">車両を選択してください</option>
 
         {/* 🚗 車両リスト */}
         <option value="car01">🚙 Car 01</option>
