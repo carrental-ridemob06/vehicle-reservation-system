@@ -20,3 +20,50 @@
   border: 1px solid #ccc;
   background-color: #fff;
 }
+input[type="date"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding: 12px;
+  font-size: 18px;
+  border: 2px solid #999;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  background-color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+/* ✅ 日付入力フィールドの高さを固定してズレ防止 */
+input[type="date"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding: 10px 12px;     /* 上下10px・左右12pxで余白を揃える */
+  font-size: 18px;
+  border: 2px solid #999;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  background-color: #fff;
+  width: 100%;
+  height: 48px;           /* ✅ 高さを固定 */
+  line-height: 1.5;       /* ✅ テキスト位置を中央に寄せる */
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* ✅ カレンダーアイコンのリセット */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 12px;           /* ✅ 右端の余白調整 */
+  top: 50%;              /* ✅ 上下中央に配置 */
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+/* ✅ Firefox 用（カレンダーアイコンがズレる問題） */
+input[type="date"]::-moz-focus-inner {
+  border: 0;
+  padding: 0;
+}

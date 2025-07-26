@@ -7,7 +7,10 @@ import { useState, useEffect } from 'react'
 import VehicleSelect from '../components/VehicleSelect'
 import NightsDisplay from '../components/NightsDisplay'
 
-// ✅ Props
+// ✅ ここでモーダルを import
+import ConfirmModal from '../components/ConfirmModal'
+import ResultModal from '../components/ResultModal'
+
 type Props = {
   userId: string;
 }
@@ -16,19 +19,17 @@ export default function CalendarUi({ userId }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  // ✅ URLから vehicle_id を取得（なければ ''）
+  // ✅ URLから vehicle_id を取得
   const defaultVehicleId = searchParams.get('vehicle_id') ?? ''
   const [vehicleId, setVehicleId] = useState(defaultVehicleId)
 
-  // ✅ .env.local からカレンダーIDを取得
+  // ✅ カレンダーID
   const car01Id = process.env.NEXT_PUBLIC_CAR01_CALENDAR_ID
   const car02Id = process.env.NEXT_PUBLIC_CAR02_CALENDAR_ID
   const car03Id = process.env.NEXT_PUBLIC_CAR03_CALENDAR_ID
 
-  // ✅ 3台まとめ用URL
   const allCarsCalendarUrl = `https://calendar.google.com/calendar/embed?src=${car01Id}&src=${car02Id}&src=${car03Id}&ctz=Asia%2FTokyo`
 
-  // ✅ 個別カレンダー用マップ
   const calendarMap: Record<string, string> = {
     car01: car01Id!,
     car02: car02Id!,
@@ -40,7 +41,6 @@ export default function CalendarUi({ userId }: Props) {
   const [endDate, setEndDate] = useState('')
   const [nights, setNights] = useState(0)
 
-  // ✅ 泊数計算
   useEffect(() => {
     if (startDate && endDate) {
       const start = new Date(startDate)
@@ -52,6 +52,12 @@ export default function CalendarUi({ userId }: Props) {
     }
   }, [startDate, endDate])
 
+  // ✅ モーダル管理
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [resultModalOpen, setResultModalOpen] = useState(false)
+  const [modalMessage, setModalMessage] = useState('')
+  const [modalAction, setModalAction] = useState<(() => void) | null>(null)
+
   // ✅ 車両変更
   const handleVehicleChange = (newId: string) => {
     setVehicleId(newId)
@@ -61,20 +67,25 @@ export default function CalendarUi({ userId }: Props) {
   // ✅ 予約処理
   const handleReserve = async () => {
     if (!userId) {
-      alert('ログインしてください。')
+      setModalMessage('❌ ログインしてください。')
+      setModalAction(null)
+      setResultModalOpen(true)
       return
     }
     if (!startDate || !endDate) {
-      alert('開始日と終了日を選択してください。')
+      setModalMessage('📅 開始日と終了日を選択してください。')
+      setModalAction(null)
+      setResultModalOpen(true)
       return
     }
     if (nights <= 0) {
-      alert('終了日は開始日以降を選んでください。')
+      setModalMessage('⚠️ 終了日は開始日以降を選んでください。')
+      setModalAction(null)
+      setResultModalOpen(true)
       return
     }
 
     const payload = { userId, vehicleId, startDate, endDate }
-
     try {
       console.log('🟡 Check Availability Payload:', payload)
 
@@ -88,224 +99,170 @@ export default function CalendarUi({ userId }: Props) {
       console.log('🟢 Check Availability Response:', data)
 
       if (!res.ok) {
-        alert(`❌ 予約不可: ${data.message}`)
+        setModalMessage(`❌ 予約不可: ${data.message}`)
+        setModalAction(null)
+        setResultModalOpen(true)
         return
       }
 
-      // ✅ confirm を使いキャンセルできる
-      const confirmBooking = window.confirm('✅ 空きあり！\nこのまま予約を確定しますか？')
+      // ✅ 確認モーダルを開く
+      setModalMessage('✅ 空きあり！ このまま予約を確定しますか？')
+      setModalAction(() => async () => {
+        const confirmRes = await fetch('/api/confirm-reservation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
 
-      if (!confirmBooking) {
-        alert('予約をキャンセルしました')
-        return
-      }
+        const confirmData = await confirmRes.json()
+        console.log('🟢 Confirm Reservation Response:', confirmData)
 
-      const confirmRes = await fetch('/api/confirm-reservation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        if (confirmRes.ok) {
+          setModalMessage(`✅ 予約が確定しました！\n予約ID: ${confirmData.reservation_id}`)
+          setResultModalOpen(true)
+          setStartDate('')
+          setEndDate('')
+          setNights(0)
+        } else {
+          setModalMessage(`❌ 予約確定エラー: ${confirmData.message}`)
+          setResultModalOpen(true)
+        }
+        setConfirmModalOpen(false)
       })
-
-      const confirmData = await confirmRes.json()
-      console.log('🟢 Confirm Reservation Response:', confirmData)
-
-      if (confirmRes.ok) {
-        alert(`✅ 予約が確定しました！\n予約ID: ${confirmData.reservation_id}`)
-        setStartDate('')
-        setEndDate('')
-        setNights(0)
-      } else {
-        alert(`❌ 予約確定エラー: ${confirmData.message}`)
-      }
+      setConfirmModalOpen(true)
     } catch (err) {
       console.error('⚡ ネットワークエラー:', err)
-      alert('ネットワークエラーが発生しました')
+      setModalMessage('⚡ ネットワークエラーが発生しました')
+      setModalAction(null)
+      setResultModalOpen(true)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-100 to-indigo-100 px-4">
-      <main className="w-full max-w-2xl mx-auto px-6 py-10 bg-white rounded-2xl shadow-xl border border-gray-200">
-        <h2 className="text-3xl font-extrabold text-center text-blue-800 mb-8">
-          🚙予約システム
-        </h2>
+  <div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', background: 'linear-gradient(to bottom, #e6f0ff, #f5f5ff)', padding: '16px' }}>
+    <main style={{
+      width: '100%',
+      maxWidth: '500px',
+      background: '#fff',
+      padding: '20px',
+      borderRadius: '16px',
+      boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+      border: '1px solid #ccc'
+    }}>
+      <h2 style={{ fontSize: '28px', textAlign: 'center', marginBottom: '20px', color: '#003366' }}>🚙予約システム</h2>
 
-        {/* 🚗 ドロップダウン */}
-        <VehicleSelect vehicleId={vehicleId} onChange={handleVehicleChange} />
+      {/* 🚗 ドロップダウン */}
+      <VehicleSelect vehicleId={vehicleId} onChange={handleVehicleChange} />
 
-        {/* 📅 Googleカレンダー */}
-        <div className="rounded-2xl overflow-hidden shadow-lg mb-10 mt-4">
-          {vehicleId === '' ? (
-            <iframe
-              src={allCarsCalendarUrl}
-              className="w-full border-0"
-              style={{ height: '470px' }}
-            />
-          ) : (
-            <iframe
-              src={`https://calendar.google.com/calendar/embed?src=${calendarMap[vehicleId]}&ctz=Asia%2FTokyo`}
-              className="w-full border-0"
-              style={{ height: '350px' }}
-            />
-          )}
-        </div>
-
-       {/* 📆 日付入力 */}
-<div style={{
-  marginBottom: '24px',
-  width: '100%',
-  boxSizing: 'border-box'
-}}>
-  <div style={{
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    marginBottom: '20px',
-    width: '100%',
-    boxSizing: 'border-box'
-  }}>
-    {/* 🚗 未選択時メッセージ */}
-    {vehicleId === '' && (
-      <p style={{
-        color: 'red',
-        fontWeight: '700',
-        fontSize: '16px',
-        marginBottom: '8px',
-        textAlign: 'center'
-      }}>
-        🚗 まず車両を選択してください
-      </p>
-    )}
-
-    {/* ✅ 開始日 */}
-    <div style={{ width: '100%' }}>
-      <label
-        style={{
-          display: 'block',
-          fontSize: '20px',
-          fontWeight: '700',
-          marginBottom: '8px',
-          color: '#333'
-        }}
-      >
-        📅 開始日
-      </label>
-      <input
-        type="date"
-        value={startDate}
-        onChange={(e) => setStartDate(e.target.value)}
-        style={{
-          width: '100%',
-          padding: '14px',
-          fontSize: '20px',
-          border: '2px solid #999',
-          borderRadius: '10px',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-          backgroundColor: '#fff',
-          boxSizing: 'border-box'
-        }}
-        disabled={vehicleId === ''}  // ✅ 車両未選択なら入力できないように
-      />
-    </div>
-
-    {/* ✅ 終了日 */}
-    <div style={{ width: '100%' }}>
-      <label
-        style={{
-          display: 'block',
-          fontSize: '20px',
-          fontWeight: '700',
-          marginBottom: '8px',
-          color: '#333'
-        }}
-      >
-        📅 終了日
-      </label>
-      <input
-        type="date"
-        value={endDate}
-        onChange={(e) => setEndDate(e.target.value)}
-        style={{
-          width: '100%',
-          padding: '14px',
-          fontSize: '20px',
-          border: '2px solid #999',
-          borderRadius: '10px',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-          backgroundColor: '#fff',
-          boxSizing: 'border-box'
-        }}
-        disabled={vehicleId === ''}  // ✅ 車両未選択なら入力できないように
-      />
-    </div>
-  </div>
-
-  {/* 🌙 泊数 + 予約ボタン */}
-<div style={{
-  display: 'flex',
-  flexDirection: 'column',   // ✅ 縦並びに変更
-  alignItems: 'center',
-  marginTop: '20px',
-  gap: '12px'
-}}>
-  {/* ✅ 泊数表示 */}
-  <div style={{
-    fontSize: '18px',
-    fontWeight: '600',
-    padding: '10px 16px',
-    border: '2px solid #ccc',
-    borderRadius: '8px',
-    backgroundColor: '#f9f9f9',
-    minWidth: '120px',
-    textAlign: 'center'
-  }}>
-    泊数: {nights} 泊
-  </div>
-
-  {/* ✅ userId があるかでボタン切替 */}
-  {userId && userId.trim() !== '' ? (
-    <button
-      onClick={handleReserve}
-      style={{
-        padding: '14px 24px',
-        fontSize: '18px',
-        fontWeight: '700',
-        border: '2px solid #007BFF',
-        borderRadius: '10px',
-        backgroundColor: vehicleId === '' ? '#ccc' : '#007BFF',
-        color: '#fff',
-        cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-        width: '100%',
-        maxWidth: '280px',
-        display: 'inline-block'
-      }}
-      disabled={vehicleId === ''}
-    >
-      🚆 この車を予約する
-    </button>
-  ) : (
-    <button
-      disabled
-      style={{
-        padding: '14px 24px',
-        fontSize: '18px',
-        fontWeight: '700',
-        border: '2px solid #aaa',
-        borderRadius: '10px',
-        backgroundColor: '#ddd',
-        color: '#666',
-        width: '100%',
-        maxWidth: '280px',
-        display: 'inline-block',
-        cursor: 'not-allowed'
-      }}
-    >
-      🚆 この車を予約する
-    </button>
+      {/* 🚗 未選択メッセージ */}
+      {vehicleId === '' && (
+        <p style={{ color: 'red', fontWeight: 'bold', textAlign: 'center', marginTop: '8px' }}>
+          🚗 まず車両を選択してください
+        </p>
       )}
-    </div>
-  </div> </main> </div>
 
- )     
-}
+      {/* 📅 Googleカレンダー（✅ グレーアウトしない） */}
+      <div style={{
+        margin: '16px 0',
+        borderRadius: '12px',
+        overflow: 'hidden'
+      }}>
+        {vehicleId === '' ? (
+          <iframe src={allCarsCalendarUrl} style={{ width: '100%', height: '470px', border: 'none' }} />
+        ) : (
+          <iframe src={`https://calendar.google.com/calendar/embed?src=${calendarMap[vehicleId]}&ctz=Asia%2FTokyo`} style={{ width: '100%', height: '350px', border: 'none' }} />
+        )}
+      </div>
+
+      {/* 📆 日付入力（✅ 未選択時はグレーアウト＆入力不可） */}
+      <div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
+        <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>📅 開始日</label>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          disabled={vehicleId === ''}
+          style={{
+            width: '100%',
+            padding: '12px',
+            fontSize: '18px',
+            border: '2px solid #999',
+            borderRadius: '8px',
+            marginBottom: '12px'
+          }}
+        />
+
+        <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>📅 終了日</label>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          disabled={vehicleId === ''}
+          style={{
+            width: '100%',
+            padding: '12px',
+            fontSize: '18px',
+            border: '2px solid #999',
+            borderRadius: '8px'
+          }}
+        />
+      </div>
+
+      {/* 🌙 泊数 */}
+      <div style={{
+        fontSize: '18px',
+        fontWeight: 'bold',
+        padding: '10px',
+        background: '#f5f5f5',
+        borderRadius: '8px',
+        textAlign: 'center',
+        marginBottom: '16px'
+      }}>
+        泊数: {nights} 泊
+      </div>
+
+      {/* 🚆 予約ボタン（✅ 未選択時はグレーアウト＆無効化） */}
+      <button
+        onClick={handleReserve}
+        disabled={vehicleId === ''}
+        style={{
+          width: '100%',
+          padding: '14px',
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#fff',
+          background: vehicleId === '' ? '#aaa' : '#007bff',
+          border: 'none',
+          borderRadius: '8px',
+          cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
+          opacity: vehicleId === '' ? 0.7 : 1
+        }}
+      >
+        🚆 この車を予約する
+      </button>
+    </main>
+  
+
+  
+
+      {/* ✅ 予約確認モーダル */}
+<ConfirmModal
+  isOpen={confirmModalOpen}
+  title="予約確認"
+  message={modalMessage}
+  onConfirm={() => { if (modalAction) modalAction() }}
+  onCancel={() => setConfirmModalOpen(false)}
+  confirmText="予約する"
+  cancelText="やめる"
+/>
+
+{/* ✅ 結果モーダル */}
+<ResultModal
+  isOpen={resultModalOpen}
+  title="予約結果"
+  message={modalMessage}
+  onClose={() => setResultModalOpen(false)}
+  confirmText="OK"
+/>
+</div>
+)}
