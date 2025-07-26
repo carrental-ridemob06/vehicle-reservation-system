@@ -175,38 +175,57 @@ export default function CalendarUi({ userId }: Props) {
       </div>
 
       {/* 📆 日付入力（✅ 未選択時はグレーアウト＆入力不可） */}
-      <div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
-        <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>📅 開始日</label>
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          disabled={vehicleId === ''}
-          style={{
-            width: '100%',
-            padding: '12px',
-            fontSize: '18px',
-            border: '2px solid #999',
-            borderRadius: '8px',
-            marginBottom: '12px'
-          }}
-        />
+<div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
+  <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>📅 開始日</label>
+  <input
+    type="date"
+    value={startDate}
+    min={(() => {
+      // ✅ 今日 + 2日後（翌々日）以降しか選べない
+      const today = new Date();
+      today.setDate(today.getDate() + 2);
+      return today.toISOString().split('T')[0];
+    })()}
+    onChange={(e) => setStartDate(e.target.value)}
+    disabled={vehicleId === ''}   // ✅ 車両未選択なら入力不可
+    style={{
+      width: '100%',
+      padding: '12px',
+      fontSize: '18px',
+      border: '2px solid #999',
+      borderRadius: '8px',
+      marginBottom: '12px'
+    }}
+  />
 
-        <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>📅 終了日</label>
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          disabled={vehicleId === ''}
-          style={{
-            width: '100%',
-            padding: '12px',
-            fontSize: '18px',
-            border: '2px solid #999',
-            borderRadius: '8px'
-          }}
-        />
-      </div>
+  <label style={{ display: 'block', fontSize: '18px', fontWeight: 'bold' }}>📅 終了日</label>
+  <input
+    type="date"
+    value={endDate}
+    min={startDate ? (() => {
+      // ✅ 開始日の翌日から
+      const minDate = new Date(startDate);
+      minDate.setDate(minDate.getDate() + 1);
+      return minDate.toISOString().split('T')[0];
+    })() : ''}
+    max={startDate ? (() => {
+      // ✅ 開始日から4日後まで（最大4泊）
+      const maxDate = new Date(startDate);
+      maxDate.setDate(maxDate.getDate() + 4);
+      return maxDate.toISOString().split('T')[0];
+    })() : ''}
+    onChange={(e) => setEndDate(e.target.value)}
+    disabled={vehicleId === ''}   // ✅ 車両未選択なら入力不可
+    style={{
+      width: '100%',
+      padding: '12px',
+      fontSize: '18px',
+      border: '2px solid #999',
+      borderRadius: '8px'
+    }}
+  />
+</div>
+
 
       {/* 🌙 泊数 */}
       <div style={{

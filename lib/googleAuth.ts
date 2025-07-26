@@ -1,6 +1,7 @@
-import { google } from 'googleapis'
+import { google, Auth } from 'googleapis'
 
-export async function getAccessToken() {
+export async function getAccessToken(): Promise<Auth.OAuth2Client> {
+  // ✅ Googleサービスアカウント認証設定
   const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -12,14 +13,10 @@ export async function getAccessToken() {
     ],
   })
 
-  const client = await auth.getClient()
-  const tokenResponse = await client.getAccessToken()
+  // ✅ OAuth2クライアントを取得（型を明示）
+  const client = (await auth.getClient()) as Auth.OAuth2Client
 
-  console.log('🔑 GOOGLE AccessToken:', tokenResponse)
+  console.log('✅ GoogleAuth クライアント作成成功')
 
-  if (!tokenResponse || !tokenResponse.token) {
-    throw new Error('アクセストークンの取得に失敗しました')
-  }
-
-  return tokenResponse.token
+  return client
 }

@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
 
     console.log('🔵 Confirm API Called:', { userId, vehicleId, startDate, endDate })
 
+    // ✅ 車ごとの Google カレンダーIDマップ
     const calendarMap: Record<string, string> = {
       car01: process.env.CAR01_CALENDAR_ID!,
       car02: process.env.CAR02_CALENDAR_ID!,
@@ -20,8 +21,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: '無効な車両IDです' }, { status: 400 })
     }
 
+    // ✅ Googleサービスアカウントのアクセストークン取得
     const accessToken = await getAccessToken()
     console.log('🔑 GOOGLE AccessToken:', accessToken)
+
+    // ✅ Googleカレンダー用に終了日を +1日
+    const endDateObj = new Date(endDate)
+    endDateObj.setDate(endDateObj.getDate() + 1)
+    const adjustedEndDate = endDateObj.toISOString().split('T')[0]
 
     // ✅ Googleカレンダーにイベント作成
     const eventRes = await fetch(
@@ -35,7 +42,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           summary: `Reservation for ${vehicleId}`,
           start: { date: startDate },
-          end: { date: endDate },
+          end: { date: adjustedEndDate },   // ✅ +1日した日付を送信
         }),
       }
     )
@@ -53,9 +60,11 @@ export async function POST(req: NextRequest) {
     const calendarEventId = eventData.id
     console.log('📜 Google Calendar Event Created:', calendarEventId)
 
+    // ✅ 泊数計算（endDate は +1せず元の日付で計算）
     const days =
       Math.ceil(
-        (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
+        (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+          (1000 * 60 * 60 * 24)
       ) || 1
 
     // ✅ Supabaseに挿入
@@ -67,7 +76,7 @@ export async function POST(req: NextRequest) {
           vehicle_id: vehicleId,
           calendar_event_id: calendarEventId,
           start_date: startDate,
-          end_date: endDate,
+          end_date: endDate,        // ✅ DBには元の日付を保存
           planId: `${days}泊`,
           status: 'confirmed',
         },
