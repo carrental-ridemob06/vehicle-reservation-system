@@ -5,12 +5,7 @@ import { useState, useEffect } from 'react'
 
 // ✅ 切り出しコンポーネント
 import VehicleSelect from '../components/VehicleSelect'
-import DatePicker from '../components/DatePicker'
 import NightsDisplay from '../components/NightsDisplay'
-
-// ✅ ボタン
-import ReserveButton from '../components/ReserveButton'
-import ReserveButtonDisabled from '../components/ReserveButtonDisabled'
 
 // ✅ Props
 type Props = {
@@ -64,71 +59,69 @@ export default function CalendarUi({ userId }: Props) {
   }
 
   // ✅ 予約処理
-const handleReserve = async () => {
-  if (!userId) {
-    alert('ログインしてください。')
-    return
-  }
-  if (!startDate || !endDate) {
-    alert('開始日と終了日を選択してください。')
-    return
-  }
-  if (nights <= 0) {
-    alert('終了日は開始日以降を選んでください。')
-    return
-  }
-
-  const payload = { userId, vehicleId, startDate, endDate }
-
-  try {
-    console.log('🟡 Check Availability Payload:', payload)
-
-    const res = await fetch('/api/check-availability', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-
-    const data = await res.json()
-    console.log('🟢 Check Availability Response:', data)
-
-    if (!res.ok) {
-      alert(`❌ 予約不可: ${data.message}`)
+  const handleReserve = async () => {
+    if (!userId) {
+      alert('ログインしてください。')
+      return
+    }
+    if (!startDate || !endDate) {
+      alert('開始日と終了日を選択してください。')
+      return
+    }
+    if (nights <= 0) {
+      alert('終了日は開始日以降を選んでください。')
       return
     }
 
-    // ✅ ここを alert → confirm に変更
-    const confirmBooking = window.confirm('✅ 空きあり！\nこのまま予約を確定しますか？')
+    const payload = { userId, vehicleId, startDate, endDate }
 
-    if (!confirmBooking) {
-      alert('予約をキャンセルしました')
-      return
+    try {
+      console.log('🟡 Check Availability Payload:', payload)
+
+      const res = await fetch('/api/check-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+      console.log('🟢 Check Availability Response:', data)
+
+      if (!res.ok) {
+        alert(`❌ 予約不可: ${data.message}`)
+        return
+      }
+
+      // ✅ confirm を使いキャンセルできる
+      const confirmBooking = window.confirm('✅ 空きあり！\nこのまま予約を確定しますか？')
+
+      if (!confirmBooking) {
+        alert('予約をキャンセルしました')
+        return
+      }
+
+      const confirmRes = await fetch('/api/confirm-reservation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const confirmData = await confirmRes.json()
+      console.log('🟢 Confirm Reservation Response:', confirmData)
+
+      if (confirmRes.ok) {
+        alert(`✅ 予約が確定しました！\n予約ID: ${confirmData.reservation_id}`)
+        setStartDate('')
+        setEndDate('')
+        setNights(0)
+      } else {
+        alert(`❌ 予約確定エラー: ${confirmData.message}`)
+      }
+    } catch (err) {
+      console.error('⚡ ネットワークエラー:', err)
+      alert('ネットワークエラーが発生しました')
     }
-
-    // ✅ OK の場合のみ予約確定APIを叩く
-    const confirmRes = await fetch('/api/confirm-reservation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-
-    const confirmData = await confirmRes.json()
-    console.log('🟢 Confirm Reservation Response:', confirmData)
-
-    if (confirmRes.ok) {
-      alert(`✅ 予約が確定しました！\n予約ID: ${confirmData.reservation_id}`)
-      setStartDate('')
-      setEndDate('')
-      setNights(0)
-    } else {
-      alert(`❌ 予約確定エラー: ${confirmData.message}`)
-    }
-  } catch (err) {
-    console.error('⚡ ネットワークエラー:', err)
-    alert('ネットワークエラーが発生しました')
   }
-}
-
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-100 to-indigo-100 px-4">
@@ -137,20 +130,18 @@ const handleReserve = async () => {
           🚆 乗り物予約カレンダー
         </h1>
 
-        {/* 🚗 ドロップダウン（VehicleSelect コンポーネント） */}
+        {/* 🚗 ドロップダウン */}
         <VehicleSelect vehicleId={vehicleId} onChange={handleVehicleChange} />
 
         {/* 📅 Googleカレンダー */}
         <div className="rounded-2xl overflow-hidden shadow-lg mb-10 mt-4">
           {vehicleId === '' ? (
-            // ✅ 未選択：3台まとめカレンダー
             <iframe
               src={allCarsCalendarUrl}
               className="w-full border-0"
               style={{ height: '470px' }}
             />
           ) : (
-            // ✅ 選択後：個別カレンダー
             <iframe
               src={`https://calendar.google.com/calendar/embed?src=${calendarMap[vehicleId]}&ctz=Asia%2FTokyo`}
               className="w-full border-0"
@@ -160,7 +151,6 @@ const handleReserve = async () => {
         </div>
 
         {/* 📆 日付入力 */}
-{/* 📆 日付入力 */}
 <div style={{
   marginBottom: '24px',
   width: '100%',
@@ -168,6 +158,7 @@ const handleReserve = async () => {
 }}>
   <div style={{
     display: 'flex',
+    flexWrap: 'wrap',              // ✅ 狭い画面で折り返し
     justifyContent: 'space-between',
     gap: '12px',
     marginBottom: '20px',
@@ -175,7 +166,7 @@ const handleReserve = async () => {
     boxSizing: 'border-box'
   }}>
     {/* ✅ 開始日 */}
-    <div style={{ flex: 1 }}>
+    <div style={{ flex: '1 1 160px', minWidth: '160px' }}>
       <label
         style={{
           display: 'block',
@@ -190,6 +181,7 @@ const handleReserve = async () => {
       <input
         type="date"
         value={startDate}
+        disabled={!vehicleId}   
         onChange={(e) => setStartDate(e.target.value)}
         style={{
           width: '100%',
@@ -198,14 +190,15 @@ const handleReserve = async () => {
           border: '2px solid #999',
           borderRadius: '10px',
           boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-          backgroundColor: '#fff',
+          backgroundColor: !vehicleId ? '#f3f3f3' : '#fff',
+          cursor: !vehicleId ? 'not-allowed' : 'text',
           boxSizing: 'border-box'
         }}
       />
     </div>
 
     {/* ✅ 終了日 */}
-    <div style={{ flex: 1 }}>
+    <div style={{ flex: '1 1 160px', minWidth: '160px' }}>
       <label
         style={{
           display: 'block',
@@ -220,6 +213,7 @@ const handleReserve = async () => {
       <input
         type="date"
         value={endDate}
+        disabled={!vehicleId}   
         onChange={(e) => setEndDate(e.target.value)}
         style={{
           width: '100%',
@@ -228,7 +222,8 @@ const handleReserve = async () => {
           border: '2px solid #999',
           borderRadius: '10px',
           boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-          backgroundColor: '#fff',
+          backgroundColor: !vehicleId ? '#f3f3f3' : '#fff',
+          cursor: !vehicleId ? 'not-allowed' : 'text',
           boxSizing: 'border-box'
         }}
       />
@@ -236,86 +231,65 @@ const handleReserve = async () => {
   </div>
 
 
- {/* 🌙 泊数 + 予約ボタン */}
-<div style={{
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginTop: '20px',
-  gap: '16px'
-}}>
-  {/* ✅ 泊数表示 */}
-  <div style={{
-    fontSize: '18px',
-    fontWeight: '600',
-    padding: '10px 16px',
-    border: '2px solid #ccc',
-    borderRadius: '8px',
-    backgroundColor: '#f9f9f9',
-    flex: '0 0 auto',
-    minWidth: '120px',          // ✅ 泊数ボックスも安定幅
-    textAlign: 'center'
-  }}>
-    泊数: {nights} 泊
-  </div>
+          {/* 🌙 泊数 + 予約ボタン */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              padding: '10px 16px',
+              border: '2px solid #ccc',
+              borderRadius: '8px',
+              backgroundColor: '#f9f9f9',
+              flex: '0 0 auto',
+              minWidth: '120px',
+              textAlign: 'center'
+            }}>
+              泊数: {nights} 泊
+            </div>
 
-  <div style={{ flex: 1, textAlign: 'right' }}>
-    {/* 📝 ログイン警告 */}
-    {!userId && (
-      <p style={{
-        color: 'red',
-        fontWeight: '600',
-        fontSize: '14px',
-        marginBottom: '8px'
-      }}>
-        ※ ログインしてから予約してください
-      </p>
-    )}
-
-    {/* ✅ userId があるかでボタン切替 */}
-    {userId && userId.trim() !== '' ? (
-      <button
-        onClick={handleReserve}
-        style={{
-          padding: '14px 24px',
-          fontSize: '18px',
-          fontWeight: '700',
-          border: '2px solid #007BFF',    // 🔵 青の枠線
-          borderRadius: '10px',
-          backgroundColor: '#007BFF',     // 🔵 青ボタン
-          color: '#fff',
-          cursor: 'pointer',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          width: '100%',             // ✅ ボタンを横幅いっぱいに伸ばす
-          maxWidth: '280px',         // ✅ 最大幅を設定してバランス調整
-          display: 'inline-block'
-        }}
-      >
-        🚆 この車を予約する
-      </button>
-    ) : (
-      <button
-        disabled
-        style={{
-          padding: '14px 24px',
-          fontSize: '18px',
-          fontWeight: '700',
-          border: '2px solid #aaa',
-          borderRadius: '10px',
-          backgroundColor: '#ddd',
-          color: '#666',
-          width: '100%',
-          maxWidth: '280px',
-          display: 'inline-block',
-          cursor: 'not-allowed'
-        }}
-      >
-        🚆 この車を予約する
-      </button>
-    )}
-  </div>
-</div></div>
-</main>
-</div>
-)
+            <div style={{ flex: 1, textAlign: 'right' }}>
+              {userId && userId.trim() !== '' ? (
+                <button
+                  onClick={handleReserve}
+                  disabled={!vehicleId}  // ✅ 車未選択なら押せない
+                  style={{
+                    padding: '14px 24px',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    border: '2px solid #007BFF',
+                    borderRadius: '10px',
+                    backgroundColor: !vehicleId ? '#ccc' : '#007BFF',
+                    color: '#fff',
+                    cursor: !vehicleId ? 'not-allowed' : 'pointer',
+                    width: '100%',
+                    maxWidth: '280px'
+                  }}
+                >
+                  🚆 この車を予約する
+                </button>
+              ) : (
+                <button
+                  disabled
+                  style={{
+                    padding: '14px 24px',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    border: '2px solid #aaa',
+                    borderRadius: '10px',
+                    backgroundColor: '#ddd',
+                    color: '#666',
+                    width: '100%',
+                    maxWidth: '280px',
+                    cursor: 'not-allowed'
+                  }}
+                >
+                  🚆 この車を予約する
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
 }
