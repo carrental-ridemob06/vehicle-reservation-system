@@ -78,7 +78,8 @@ export async function POST(req: NextRequest) {
           start_date: startDate,
           end_date: endDate,        // ✅ DBには元の日付を保存
           planId: `${days}泊`,
-          status: 'confirmed',
+          status: 'pending',
+          payment_status: 'unpaid',
         },
       ])
       .select()
