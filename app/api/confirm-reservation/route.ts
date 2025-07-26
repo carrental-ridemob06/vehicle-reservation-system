@@ -50,6 +50,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: '無効な車両IDです' }, { status: 400 });
     }
 
+    // ✅ 1️⃣ まず Supabase で重複予約チェック
+    const { data: existing } = await supabase
+      .from('carrental')
+      .select('id')
+      .eq('vehicle_id', vehicleId)
+      .eq('start_date', startDate)
+      .eq('end_date', endDate)
+      .in('status', ['pending', 'confirmed'])
+      .maybeSingle();
+
+    if (existing) {
+      console.log('⚠️ 重複予約を検知: ID=', existing.id);
+      return NextResponse.json({
+        message: '⚠️ すでに同じ日程で予約があります',
+        reservation_id: existing.id
+      }, { status: 400 });
+    }
+
     // ✅ Googleサービスアカウントのアクセストークン取得
     const accessToken = await getAccessToken();
     console.log('🔑 GOOGLE AccessToken:', accessToken);
@@ -96,7 +114,7 @@ export async function POST(req: NextRequest) {
           (1000 * 60 * 60 * 24)
       ) || 1;
 
-    // ✅ Supabaseに挿入
+    // ✅ Supabaseに挿入（重複チェックを通過した場合のみ）
     const { data, error } = await supabase
       .from('carrental')
       .insert([
@@ -127,17 +145,17 @@ export async function POST(req: NextRequest) {
 
       // ✅ JST（yyyy/MM/dd HH:mm:ss）で created_at を作成
       const jpCreatedAt = new Date().toLocaleString("ja-JP", {
-  timeZone: "Asia/Tokyo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit"
-});
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
 
-// ✅ Google Sheets で “テキスト” として扱わせるため ' を付ける
-const sheetTimestamp = `'${jpCreatedAt}'`;
+      // ✅ Google Sheets で “テキスト” として扱わせるため ' を付ける
+      const sheetTimestamp = `'${jpCreatedAt}'`;
 
       const sheetsURL = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEETS_ID}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED`;
 
