@@ -5,10 +5,13 @@ import CalendarUi from './components/CalendarUi'
 
 export default function HomePage() {
   const searchParams = useSearchParams()
-  const userId = searchParams.get('user') ?? 'test-user-001'
+
+  // ✅ URL の ?user= を取得（なければ null）
+  const userId = searchParams.get('user') || ''
 
   return (
     <main>
+      {/* ✅ userId を明示的に渡す */}
       <CalendarUi userId={userId} />
     </main>
   )

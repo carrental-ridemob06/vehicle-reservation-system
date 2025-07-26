@@ -3,29 +3,49 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
+// ✅ 切り出しコンポーネント
+import VehicleSelect from '../components/VehicleSelect'
+import DatePicker from '../components/DatePicker'
+import NightsDisplay from '../components/NightsDisplay'
+
+// ✅ ボタン
+import ReserveButton from '../components/ReserveButton'
+import ReserveButtonDisabled from '../components/ReserveButtonDisabled'
+
+// ✅ Props
 type Props = {
-  userId: string
+  userId: string;
 }
 
 export default function CalendarUi({ userId }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const defaultVehicleId = searchParams.get('vehicle_id') ?? 'car01'
+  // ✅ URLから vehicle_id を取得（なければ ''）
+  const defaultVehicleId = searchParams.get('vehicle_id') ?? ''
   const [vehicleId, setVehicleId] = useState(defaultVehicleId)
 
+  // ✅ .env.local からカレンダーIDを取得
+  const car01Id = process.env.NEXT_PUBLIC_CAR01_CALENDAR_ID
+  const car02Id = process.env.NEXT_PUBLIC_CAR02_CALENDAR_ID
+  const car03Id = process.env.NEXT_PUBLIC_CAR03_CALENDAR_ID
+
+  // ✅ 3台まとめ用URL
+  const allCarsCalendarUrl = `https://calendar.google.com/calendar/embed?src=${car01Id}&src=${car02Id}&src=${car03Id}&ctz=Asia%2FTokyo`
+
+  // ✅ 個別カレンダー用マップ
   const calendarMap: Record<string, string> = {
-    car01: process.env.NEXT_PUBLIC_CAR01_CALENDAR_ID || 'car01_calendar_id@group.calendar.google.com',
-    car02: process.env.NEXT_PUBLIC_CAR02_CALENDAR_ID || 'car02_calendar_id@group.calendar.google.com',
-    car03: process.env.NEXT_PUBLIC_CAR03_CALENDAR_ID || 'car03_calendar_id@group.calendar.google.com',
+    car01: car01Id!,
+    car02: car02Id!,
+    car03: car03Id!,
   }
 
-  const calendarId = calendarMap[vehicleId] || calendarMap['car01']
-
+  // ✅ 日付管理
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [nights, setNights] = useState(0)
 
+  // ✅ 泊数計算
   useEffect(() => {
     if (startDate && endDate) {
       const start = new Date(startDate)
@@ -37,138 +57,265 @@ export default function CalendarUi({ userId }: Props) {
     }
   }, [startDate, endDate])
 
-  const handleVehicleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newId = e.target.value
+  // ✅ 車両変更
+  const handleVehicleChange = (newId: string) => {
     setVehicleId(newId)
     router.replace(`?user=${userId}&vehicle_id=${newId}`)
   }
 
-  const handleReserve = async () => {
-    if (!startDate || !endDate) {
-      alert('開始日と終了日を選択してください。')
-      return
-    }
-    if (nights <= 0) {
-      alert('終了日は開始日以降を選んでください。')
-      return
-    }
-
-    const payload = {
-      userId,
-      vehicleId,
-      startDate,
-      endDate,
-    }
-
-    try {
-      console.log('🟡 Check Availability Payload:', payload)
-
-      const res = await fetch('/api/check-availability', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
-      console.log('🟢 Check Availability Response:', data)
-      console.log('🧾 HTTP Status:', res.status)
-
-      if (!res.ok) {
-        alert(`❌ 予約不可: ${data.message}`)
-        return
-      }
-
-      alert('✅ 空きあり！ 予約確定します')
-
-      console.log('🟣 Confirm Reservation 開始')
-
-      const confirmRes = await fetch('/api/confirm-reservation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const confirmData = await confirmRes.json()
-      console.log('🟢 Confirm Reservation Response:', confirmData)
-      console.log('🧾 HTTP Status:', confirmRes.status)
-
-      if (confirmRes.ok) {
-        alert(`✅ 予約が確定しました！\n予約ID: ${confirmData.reservation_id}`)
-        setStartDate('')
-        setEndDate('')
-        setNights(0)
-      } else {
-        alert(`❌ 予約確定エラー: ${confirmData.message}`)
-      }
-
-    } catch (err) {
-      console.error('⚡ ネットワークエラー:', err)
-      alert('ネットワークエラーが発生しました')
-    }
+  // ✅ 予約処理
+const handleReserve = async () => {
+  if (!userId) {
+    alert('ログインしてください。')
+    return
   }
+  if (!startDate || !endDate) {
+    alert('開始日と終了日を選択してください。')
+    return
+  }
+  if (nights <= 0) {
+    alert('終了日は開始日以降を選んでください。')
+    return
+  }
+
+  const payload = { userId, vehicleId, startDate, endDate }
+
+  try {
+    console.log('🟡 Check Availability Payload:', payload)
+
+    const res = await fetch('/api/check-availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await res.json()
+    console.log('🟢 Check Availability Response:', data)
+
+    if (!res.ok) {
+      alert(`❌ 予約不可: ${data.message}`)
+      return
+    }
+
+    // ✅ ここを alert → confirm に変更
+    const confirmBooking = window.confirm('✅ 空きあり！\nこのまま予約を確定しますか？')
+
+    if (!confirmBooking) {
+      alert('予約をキャンセルしました')
+      return
+    }
+
+    // ✅ OK の場合のみ予約確定APIを叩く
+    const confirmRes = await fetch('/api/confirm-reservation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const confirmData = await confirmRes.json()
+    console.log('🟢 Confirm Reservation Response:', confirmData)
+
+    if (confirmRes.ok) {
+      alert(`✅ 予約が確定しました！\n予約ID: ${confirmData.reservation_id}`)
+      setStartDate('')
+      setEndDate('')
+      setNights(0)
+    } else {
+      alert(`❌ 予約確定エラー: ${confirmData.message}`)
+    }
+  } catch (err) {
+    console.error('⚡ ネットワークエラー:', err)
+    alert('ネットワークエラーが発生しました')
+  }
+}
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-100 to-indigo-100 px-4">
       <main className="w-full max-w-2xl mx-auto px-6 py-10 bg-white rounded-2xl shadow-xl border border-gray-200">
-        <h1 className="text-3xl font-extrabold text-center text-blue-800 mb-8">🚗 車両予約カレンダー</h1>
+        <h1 className="text-3xl font-extrabold text-center text-blue-800 mb-8">
+          🚆 乗り物予約カレンダー
+        </h1>
 
-        {/* 車両選択 */}
-        <div className="mb-6">
-          <label className="block mb-2 text-lg font-semibold text-gray-700">車両を選択:</label>
-          <select
-            value={vehicleId}
-            onChange={handleVehicleChange}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            <option value="car01">car01</option>
-            <option value="car02">car02</option>
-            <option value="car03">car03</option>
-          </select>
-        </div>
+        {/* 🚗 ドロップダウン（VehicleSelect コンポーネント） */}
+        <VehicleSelect vehicleId={vehicleId} onChange={handleVehicleChange} />
 
-        {/* カレンダー埋め込み */}
-        <div className="rounded-2xl overflow-hidden shadow-lg mb-10">
-          <iframe
-            src={`https://calendar.google.com/calendar/embed?src=${calendarId}&ctz=Asia%2FTokyo`}
-            className="w-full h-[500px] border-0"
-          />
-        </div>
-
-        {/* 予約日付・泊数 */}
-        <div className="space-y-6">
-          <div>
-            <label className="block text-base mb-2 font-semibold text-gray-700">開始日:</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
+        {/* 📅 Googleカレンダー */}
+        <div className="rounded-2xl overflow-hidden shadow-lg mb-10 mt-4">
+          {vehicleId === '' ? (
+            // ✅ 未選択：3台まとめカレンダー
+            <iframe
+              src={allCarsCalendarUrl}
+              className="w-full border-0"
+              style={{ height: '470px' }}
             />
-          </div>
-
-          <div>
-            <label className="block text-base mb-2 font-semibold text-gray-700">終了日:</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
+          ) : (
+            // ✅ 選択後：個別カレンダー
+            <iframe
+              src={`https://calendar.google.com/calendar/embed?src=${calendarMap[vehicleId]}&ctz=Asia%2FTokyo`}
+              className="w-full border-0"
+              style={{ height: '350px' }}
             />
-          </div>
-
-          <div className="text-base text-gray-700">
-            泊数: <strong className="text-blue-700">{nights}</strong> 泊
-          </div>
-
-          {/* 予約ボタン */}
-          <button
-            onClick={handleReserve}
-            className="w-full bg-blue-600 hover:bg-blue-700 transition text-white text-lg py-4 rounded-xl font-bold shadow-md"
-          >
-            📝 この車を予約する
-          </button>
+          )}
         </div>
-      </main>
+
+        {/* 📆 日付入力 */}
+{/* 📆 日付入力 */}
+<div style={{
+  marginBottom: '24px',
+  width: '100%',
+  boxSizing: 'border-box'
+}}>
+  <div style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '12px',
+    marginBottom: '20px',
+    width: '100%',
+    boxSizing: 'border-box'
+  }}>
+    {/* ✅ 開始日 */}
+    <div style={{ flex: 1 }}>
+      <label
+        style={{
+          display: 'block',
+          fontSize: '20px',
+          fontWeight: '700',
+          marginBottom: '8px',
+          color: '#333'
+        }}
+      >
+        📅 開始日
+      </label>
+      <input
+        type="date"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '14px',
+          fontSize: '20px',
+          border: '2px solid #999',
+          borderRadius: '10px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+          backgroundColor: '#fff',
+          boxSizing: 'border-box'
+        }}
+      />
     </div>
-  )
+
+    {/* ✅ 終了日 */}
+    <div style={{ flex: 1 }}>
+      <label
+        style={{
+          display: 'block',
+          fontSize: '20px',
+          fontWeight: '700',
+          marginBottom: '8px',
+          color: '#333'
+        }}
+      >
+        📅 終了日
+      </label>
+      <input
+        type="date"
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '14px',
+          fontSize: '20px',
+          border: '2px solid #999',
+          borderRadius: '10px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+          backgroundColor: '#fff',
+          boxSizing: 'border-box'
+        }}
+      />
+    </div>
+  </div>
+
+
+ {/* 🌙 泊数 + 予約ボタン */}
+<div style={{
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginTop: '20px',
+  gap: '16px'
+}}>
+  {/* ✅ 泊数表示 */}
+  <div style={{
+    fontSize: '18px',
+    fontWeight: '600',
+    padding: '10px 16px',
+    border: '2px solid #ccc',
+    borderRadius: '8px',
+    backgroundColor: '#f9f9f9',
+    flex: '0 0 auto',
+    minWidth: '120px',          // ✅ 泊数ボックスも安定幅
+    textAlign: 'center'
+  }}>
+    泊数: {nights} 泊
+  </div>
+
+  <div style={{ flex: 1, textAlign: 'right' }}>
+    {/* 📝 ログイン警告 */}
+    {!userId && (
+      <p style={{
+        color: 'red',
+        fontWeight: '600',
+        fontSize: '14px',
+        marginBottom: '8px'
+      }}>
+        ※ ログインしてから予約してください
+      </p>
+    )}
+
+    {/* ✅ userId があるかでボタン切替 */}
+    {userId && userId.trim() !== '' ? (
+      <button
+        onClick={handleReserve}
+        style={{
+          padding: '14px 24px',
+          fontSize: '18px',
+          fontWeight: '700',
+          border: '2px solid #007BFF',    // 🔵 青の枠線
+          borderRadius: '10px',
+          backgroundColor: '#007BFF',     // 🔵 青ボタン
+          color: '#fff',
+          cursor: 'pointer',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+          width: '100%',             // ✅ ボタンを横幅いっぱいに伸ばす
+          maxWidth: '280px',         // ✅ 最大幅を設定してバランス調整
+          display: 'inline-block'
+        }}
+      >
+        🚆 この車を予約する
+      </button>
+    ) : (
+      <button
+        disabled
+        style={{
+          padding: '14px 24px',
+          fontSize: '18px',
+          fontWeight: '700',
+          border: '2px solid #aaa',
+          borderRadius: '10px',
+          backgroundColor: '#ddd',
+          color: '#666',
+          width: '100%',
+          maxWidth: '280px',
+          display: 'inline-block',
+          cursor: 'not-allowed'
+        }}
+      >
+        🚆 この車を予約する
+      </button>
+    )}
+  </div>
+</div></div>
+</main>
+</div>
+)
 }

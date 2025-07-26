@@ -2,7 +2,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-.custom-calendar {
-  font-family: 'Noto Sans JP', sans-serif;
-  letter-spacing: 0.02em;
+
+/* ✅ Tailwind forms がボタンに当てるデフォルトCSSを解除 */
+@layer base {
+  button {
+    @apply appearance-none;
+  }
+}
+/* styles/globals.css */
+.vehicle-select {
+  width: 95%;        /* スマホでも見やすい幅 */
+  font-size: 1.4rem; /* 文字サイズを大きく */
+  padding: 12px;     /* 内側余白を広めに */
+  margin-top: 8px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background-color: #fff;
 }
