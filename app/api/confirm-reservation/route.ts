@@ -2,82 +2,99 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAccessToken } from '../../../lib/googleAuth'
 import { supabase } from '../../../lib/supabase'
 
-/**
- * ✅ Click用（秒なし、yyyy-MM-dd HH:mm）
- */
-function getJSTDateForClick() {
-  const now = new Date();
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const year = jst.getFullYear();
-  const month = String(jst.getMonth() + 1).padStart(2, '0');
-  const day = String(jst.getDate()).padStart(2, '0');
-  const hour = String(jst.getHours()).padStart(2, '0');
-  const minute = String(jst.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hour}:${minute}`;
-}
-
-/**
- * ✅ Google Sheets用（JSTシンプル yyyy/MM/dd HH:mm:ss）
- */
-function getJSTDateForSheets() {
-  const now = new Date();
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const year = jst.getFullYear();
-  const month = String(jst.getMonth() + 1).padStart(2, '0');
-  const day = String(jst.getDate()).padStart(2, '0');
-  const hour = String(jst.getHours()).padStart(2, '0');
-  const minute = String(jst.getMinutes()).padStart(2, '0');
-  const second = String(jst.getSeconds()).padStart(2, '0');
-  return `${year}/${month}/${day} ${hour}:${minute}:${second}`;
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, vehicleId, startDate, endDate } = body;
+    const { userId, vehicleId, startDate, endDate, option_child_seat, option_insurance } = body;
 
     console.log('🔵 Confirm API Called:', { userId, vehicleId, startDate, endDate });
 
-    // ✅ 車ごとの Google カレンダーIDマップ
+    // ✅ カレンダーID取得
     const calendarMap: Record<string, string> = {
       car01: process.env.CAR01_CALENDAR_ID!,
       car02: process.env.CAR02_CALENDAR_ID!,
       car03: process.env.CAR03_CALENDAR_ID!,
     };
-
     const calendarId = calendarMap[vehicleId];
-    if (!calendarId) {
-      return NextResponse.json({ message: '無効な車両IDです' }, { status: 400 });
+
+    // ✅ 車両情報取得
+    const { data: car, error: carError } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('car_no', vehicleId)
+      .single();
+
+    if (carError || !car) {
+      return NextResponse.json({ message: '車両情報が見つかりません' }, { status: 400 });
     }
 
-    // ✅ 1️⃣ まず Supabase で重複予約チェック
-    const { data: existing } = await supabase
-      .from('carrental')
-      .select('id')
-      .eq('vehicle_id', vehicleId)
-      .eq('start_date', startDate)
-      .eq('end_date', endDate)
-      .in('status', ['pending', 'confirmed'])
-      .maybeSingle();
+    // ✅ 泊数計算 & プラン判定
+    const sameDay = startDate === endDate;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    let days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (existing) {
-      console.log('⚠️ 重複予約を検知: ID=', existing.id);
-      return NextResponse.json({
-        message: '⚠️ すでに同じ日程で予約があります',
-        reservation_id: existing.id
-      }, { status: 400 });
+    if (sameDay) {
+      days = 0; // 泊数は0泊扱い（プランは当日）
+    } else if (days <= 0) {
+      days = 1; // 安全策（終了日が開始日より前のケース回避）
     }
+
+    // ✅ 料金計算
+    let plan_price: number;
+    let planLabel: string;
+
+    if (sameDay) {
+      plan_price = car.price_same_day; // ✅ 同日価格
+      planLabel = '当日';
+    } else {
+      plan_price = car.price_1n; // ✅ 通常1泊以上の価格
+      planLabel = `${days}泊`;
+    }
+
+    const option_price_child_seat = option_child_seat ? car.option_price_1 * (sameDay ? 1 : days) : 0;
+    const option_price_insurance = option_insurance ? car.option_price_2 * (sameDay ? 1 : days) : 0;
+    const total_price = plan_price + option_price_child_seat + option_price_insurance;
 
     // ✅ Googleサービスアカウントのアクセストークン取得
     const accessToken = await getAccessToken();
-    console.log('🔑 GOOGLE AccessToken:', accessToken);
 
-    // ✅ Googleカレンダー用に終了日を +1日
+    // ✅ Supabase reservations に INSERT（Google登録より先）
+    const { data: reservationData, error: reservationError } = await supabase
+      .from('reservations')
+      .insert([
+        {
+          user_id: userId,
+          vehicle_id: vehicleId,
+          car_name: car.name,
+          rank: car.rank,
+          number_plate: car.number_plate,
+          start_date: startDate,
+          end_date: endDate,
+          plan_id: planLabel, // ✅ 同日なら「当日」
+          plan_price: Number(plan_price),
+          option_child_seat,
+          option_insurance,
+          option_price_child_seat: Number(option_price_child_seat),
+          option_price_insurance: Number(option_price_insurance),
+          total_price: Number(total_price),
+          status: 'pending',
+        },
+      ])
+      .select();
+
+    if (reservationError || !reservationData) {
+      console.error('🚨 reservations Insert Error:', reservationError);
+      return NextResponse.json({ message: '❌ Supabase reservations 保存に失敗しました' }, { status: 500 });
+    }
+
+    const reservationId = reservationData[0].reservation_id;
+
+    // ✅ Googleカレンダー登録（Supabase成功後）
     const endDateObj = new Date(endDate);
     endDateObj.setDate(endDateObj.getDate() + 1);
     const adjustedEndDate = endDateObj.toISOString().split('T')[0];
 
-    // ✅ Googleカレンダーにイベント作成
     const eventRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
       {
@@ -89,61 +106,53 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           summary: `${vehicleId}`,
           start: { date: startDate },
-          end: { date: adjustedEndDate },   // ✅ +1日した日付を送信
+          end: { date: adjustedEndDate },
         }),
       }
     );
 
     const eventData = await eventRes.json();
-
     if (!eventRes.ok || !eventData.id) {
-      console.error('🚫 Google Calendar イベント作成失敗:', eventRes.status, eventData);
-      return NextResponse.json(
-        { message: 'Googleカレンダーへの登録に失敗しました' },
-        { status: 500 }
-      );
+      // Google登録失敗したら reservations を削除（ロールバック）
+      await supabase.from('reservations').delete().eq('reservation_id', reservationId);
+      return NextResponse.json({ message: '❌ Googleカレンダーへの登録に失敗しました' }, { status: 500 });
     }
 
     const calendarEventId = eventData.id;
-    console.log('📜 Google Calendar Event Created:', calendarEventId);
 
-    // ✅ 泊数計算（endDate は +1せず元の日付で計算）
-    const days =
-      Math.ceil(
-        (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-          (1000 * 60 * 60 * 24)
-      ) || 1;
-
-    // ✅ Supabaseに挿入（重複チェックを通過した場合のみ）
-    const { data, error } = await supabase
+    // ✅ carrental にも INSERT（GoogleカレンダーIDつき）
+    const { data: carrentalData, error: carrentalError } = await supabase
       .from('carrental')
       .insert([
         {
+          reservation_uuid: reservationId,
           user_id: userId,
           vehicle_id: vehicleId,
-          calendar_event_id: calendarEventId,
+          car_name: car.name,
+          rank: car.rank,
+          number_plate: car.number_plate,
           start_date: startDate,
-          end_date: endDate,        // ✅ DBには元の日付を保存
-          planId: `${days}泊`,
-          status: 'pending',
+          end_date: endDate,
+          planId: planLabel, // ✅ 同日なら「当日」
+          car_rental_price: Number(plan_price),
+          option_price_1: Number(option_price_child_seat),
+          option_price_2: Number(option_price_insurance),
+          total_price: Number(total_price),
+          calendar_event_id: calendarEventId,
           payment_status: 'unpaid',
+          status: 'pending',
         },
       ])
       .select();
 
-    if (error || !data || data.length === 0) {
-      console.error('🚫 Supabase Insert Error:', JSON.stringify(error, null, 2));
-      return NextResponse.json({ message: 'DB保存に失敗しました' }, { status: 500 });
+    if (carrentalError) {
+      console.error('🚨 carrental Insert Error:', carrentalError);
+    } else {
+      console.log('✅ carrental Insert Success:', carrentalData);
     }
 
-    const reservationId = data[0].id;
-    console.log('✅ Supabase Reservation ID:', reservationId);
-
-    // ✅ Google Sheetsへ書き込み
+    // ✅ Google Sheets に carrental 情報を書き込み
     if (process.env.GOOGLE_SHEETS_ID) {
-      console.log('🟢 Sheets書き込みを開始します...');
-
-      // ✅ JST（yyyy/MM/dd HH:mm:ss）で created_at を作成
       const jpCreatedAt = new Date().toLocaleString("ja-JP", {
         timeZone: "Asia/Tokyo",
         year: "numeric",
@@ -154,28 +163,27 @@ export async function POST(req: NextRequest) {
         second: "2-digit"
       });
 
-      // ✅ Google Sheets で “テキスト” として扱わせるため ' を付ける
-      const sheetTimestamp = `'${jpCreatedAt}'`;
+      const sheetPayload = {
+        values: [[
+          reservationId || '',
+          userId || '',
+          vehicleId || '',
+          calendarEventId || '',
+          startDate || '',
+          endDate || '',
+          planLabel || '',   // ✅ 「当日」または「◯泊」
+          plan_price ?? 0,
+          option_price_child_seat ?? 0,
+          option_price_insurance ?? 0,
+          total_price ?? 0,
+          'pending',
+          jpCreatedAt || ''
+        ]]
+      };
 
       const sheetsURL = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEETS_ID}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED`;
 
-      const sheetPayload = {
-        values: [
-          [
-            reservationId,
-            userId,
-            vehicleId,
-            calendarEventId,
-            startDate,
-            endDate,
-            `${days}泊`,
-            'pending',    // ← 仮予約のステータス
-            sheetTimestamp,   // ← JSTのテキスト（シングルクォート付き）
-          ],
-        ],
-      };
-
-      const sheetsRes = await fetch(sheetsURL, {
+      await fetch(sheetsURL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,25 +191,15 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify(sheetPayload),
       });
-
-      const sheetsData = await sheetsRes.json();
-
-      if (sheetsRes.ok) {
-        console.log('✅ Sheets Append 成功:', JSON.stringify(sheetsData, null, 2));
-      } else {
-        console.error('🚫 Sheets Append エラー:', sheetsRes.status, sheetsRes.statusText);
-        console.error('📄 エラー内容:', JSON.stringify(sheetsData, null, 2));
-      }
-    } else {
-      console.log('⚠️ Sheets IDが未設定のため、スキップしました');
     }
 
     return NextResponse.json({
       reservation_id: reservationId,
-      message: '予約が確定しました！',
+      message: `✅ 予約が確定しました！（プラン: ${planLabel}）`,
     });
+
   } catch (err) {
     console.error('🔥 Confirm Reservation Error:', err);
-    return NextResponse.json({ message: 'サーバーエラー' }, { status: 500 });
+    return NextResponse.json({ message: '❌ サーバーエラー' }, { status: 500 });
   }
 }
