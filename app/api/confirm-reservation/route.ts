@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          summary: `Reservation for ${vehicleId}`,
+          summary: `${vehicleId}`,
           start: { date: startDate },
           end: { date: adjustedEndDate },   // ✅ +1日した日付を送信
         }),

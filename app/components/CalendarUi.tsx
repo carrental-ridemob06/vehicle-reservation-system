@@ -35,6 +35,12 @@ export default function CalendarUi({ userId }: Props) {
     car02: car02Id!,
     car03: car03Id!,
   }
+  const colorMap: Record<string, string> = {
+  car01: '%23039be5', // 青
+  car02: '%23ef6c00', // オレンジ
+  car03: '%2333b679'  // 緑
+};
+
 
   // ✅ 日付管理
   const [startDate, setStartDate] = useState('')
@@ -162,17 +168,37 @@ export default function CalendarUi({ userId }: Props) {
       )}
 
       {/* 📅 Googleカレンダー（✅ グレーアウトしない） */}
-      <div style={{
-        margin: '16px 0',
-        borderRadius: '12px',
-        overflow: 'hidden'
-      }}>
-        {vehicleId === '' ? (
-          <iframe src={allCarsCalendarUrl} style={{ width: '100%', height: '470px', border: 'none' }} />
-        ) : (
-          <iframe src={`https://calendar.google.com/calendar/embed?src=${calendarMap[vehicleId]}&ctz=Asia%2FTokyo`} style={{ width: '100%', height: '350px', border: 'none' }} />
-        )}
-      </div>
+      
+      <div
+  style={{
+    margin: '16px 0',
+    borderRadius: '12px',
+    overflow: 'hidden'
+  }}
+>
+  <div
+  style={{
+    margin: '16px 0',
+    borderRadius: '12px',
+    overflow: 'hidden'
+  }}
+>
+  {vehicleId === '' ? (
+    // ✅ 全カレンダーまとめて表示（最新版 iframe URL に差し替え）
+    <iframe
+      src="https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&title=%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC&showTz=0&showTitle=0&src=Y2FycmVudGFsLnJpZGVtb2IwNkBnbWFpbC5jb20&src=M2RkNjNjZDliZmE4MmMyMDNmYWI2NTg1ZmU5NmZjODFhMDAyOTZhMmY5YTljZjFmZGIxNjJiNmQzYTc3NGYxM0Bncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=ODY5ZTcwMzg5ZDc4NGViNmQ5ZDllMzE4NmUyNzQxY2E2NzQ5MGY4ZmY4Nzc1YjhlOTY2NTExZjc4NDExNjY4NkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=ZTIyZTBiMGI2NGQ4MjQxY2EwZThlODMzNWQ1YzQwZjY4NTYwMzdmZGZiNzFiN2E1ZWI4YmJiNTNlMjM5NjA5OUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=amEuamFwYW5lc2UjaG9saWRheUBncm91cC52LmNhbGVuZGFyLmdvb2dsZS5jb20&color=%23009688&color=%23039be5&color=%23ef6c00&color=%2333b679&color=%23e4c441"
+      style={{ width: '100%', height: '470px', border: 'none' }}
+    />
+  ) : (
+    // ✅ 単体カレンダー表示（車ごとに違う色）
+    <iframe
+      src={`https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&showTz=0&showTitle=0&src=${calendarMap[vehicleId]}&color=${colorMap[vehicleId]}`}
+      style={{ width: '100%', height: '350px', border: 'none' }}
+    />
+  )}
+</div></div>
+
+
 
       {/* 📆 日付入力（✅ 未選択時はグレーアウト＆入力不可） */}
 <div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
