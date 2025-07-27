@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
           reservationId || '',
           userId || '',
           vehicleId || '',
-          calendarEventId || '',
+          car.name || '',
           startDate || '',
           endDate || '',
           planLabel || '',   // ✅ 「当日」または「◯泊」
