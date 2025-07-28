@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic'
 import { Japanese } from 'flatpickr/dist/l10n/ja'
 import 'flatpickr/dist/flatpickr.min.css'
-import { useRef } from 'react'
-import styles from './DatePicker.module.css'   // ✅ 追加
+import { useRef, useEffect } from 'react'
+import styles from './DatePicker.module.css'
 
 const Flatpickr = dynamic(() => import('react-flatpickr'), { ssr: false })
 
@@ -27,6 +27,17 @@ const formatDate = (date: Date) => {
 export default function DatePicker({ label, value, onChange, minDate, maxDate, disabled }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
 
+  // ✅ Flatpickr の input スタイルを強制的に左寄せに変更
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('.flatpickr-input')
+      inputs.forEach(input => {
+        input.style.textAlign = 'left'
+      })
+    }, 100) // Flatpickr が描画されたあと実行
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
     <div className={styles.dateWrapper} ref={wrapRef}>
       <label className={styles.dateLabel}>{label}</label>
@@ -42,7 +53,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, d
           appendTo: wrapRef.current || undefined,
         }}
         onChange={(dates) => onChange(dates[0] ? formatDate(dates[0]) : '')}
-        className={styles.dateInput}    // ✅ ここでCSSを適用
+        className={styles.dateInput}
         disabled={disabled}
       />
     </div>
