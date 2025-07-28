@@ -95,6 +95,9 @@ export default function CalendarUi({ userId }: Props) {
   // ✅ コピー時のボタンアニメーション用
   const [copied, setCopied] = useState(false);
 
+  // ✅ タブ切り替え状態（📆 カレンダー or 🖊 日付入力）
+  const [tab, setTab] = useState<'calendar' | 'form'>('calendar');
+
   // ✅ 予約IDをコピーする関数（alert → CopyModal）
   const copyReservationId = () => {
     navigator.clipboard.writeText(reservationId);
@@ -116,7 +119,7 @@ export default function CalendarUi({ userId }: Props) {
     router.replace(`?user=${userId}&vehicle_id=${newId}`)
   }
 
-  // ✅ 予約処理（既存ロジック）
+  // ✅ 予約処理
   const handleReserve = async () => {
     if (!userId) {
       setModalMessage('❌ ログインしてください。')
@@ -239,37 +242,68 @@ export default function CalendarUi({ userId }: Props) {
         {/* 🚗 ドロップダウン */}
         <VehicleSelect vehicleId={vehicleId} onChange={handleVehicleChange} />
 
-        {/* 📅 Googleカレンダー */}
-        <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden' }}>
-          {vehicleId === '' ? (
-            <iframe
-              src="https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&title=%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC&showTz=0&showTitle=0"
-              style={{ width: '100%', height: '470px', border: 'none' }}
-            />
-          ) : (
-            <iframe
-              src={`https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&showTz=0&showTitle=0&src=${calendarMap[vehicleId]}&color=${colorMap[vehicleId]}`}
-              style={{ width: '100%', height: '350px', border: 'none' }}
-            />
-          )}
+        {/* 🔀 タブ切り替え */}
+        <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
+          <button
+            onClick={() => setTab('calendar')}
+            style={{
+              flex: 1, padding: 8,
+              background: tab === 'calendar' ? '#007bff' : '#eee',
+              color: tab === 'calendar' ? '#fff' : '#000',
+              border: 'none', borderRadius: 6
+            }}
+          >
+            📆 空き状況
+          </button>
+
+          <button
+            onClick={() => setTab('form')}
+            style={{
+              flex: 1, padding: 8,
+              background: tab === 'form' ? '#007bff' : '#eee',
+              color: tab === 'form' ? '#fff' : '#000',
+              border: 'none', borderRadius: 6
+            }}
+          >
+            🖊 日付入力
+          </button>
         </div>
 
-        {/* 📆 日付入力 */}
-        <div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
-          <DatePicker
-            label="📅 開始日"
-            value={startDate}
-            onChange={setStartDate}
-            minDate={minSelectableDate}
-          />
-          <DatePicker
-            label="📅 終了日"
-            value={endDate}
-            onChange={setEndDate}
-            minDate={startDate || minSelectableDate}
-            maxDate={maxEndDate}   // ✅ 4日後までしか選べない
-          />
-        </div>
+        {/* 📅 Googleカレンダー（tab=calendarのときのみ） */}
+        {tab === 'calendar' && (
+          <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden' }}>
+            {vehicleId === '' ? (
+              <iframe
+                src="https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&title=%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC&showTz=0&showTitle=0"
+                style={{ width: '100%', height: '470px', border: 'none' }}
+              />
+            ) : (
+              <iframe
+                src={`https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&showTz=0&showTitle=0&src=${calendarMap[vehicleId]}&color=${colorMap[vehicleId]}`}
+                style={{ width: '100%', height: '350px', border: 'none' }}
+              />
+            )}
+          </div>
+        )}
+
+        {/* 📆 日付入力（tab=formのときのみ） */}
+        {tab === 'form' && (
+          <div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
+            <DatePicker
+              label="📅 開始日"
+              value={startDate}
+              onChange={setStartDate}
+              minDate={minSelectableDate}
+            />
+            <DatePicker
+              label="📅 終了日"
+              value={endDate}
+              onChange={setEndDate}
+              minDate={startDate || minSelectableDate}
+              maxDate={maxEndDate}
+            />
+          </div>
+        )}
 
         {/* 🌙 泊数 */}
         <div style={{
@@ -313,36 +347,34 @@ export default function CalendarUi({ userId }: Props) {
 
         {/* 🚆 予約ボタン */}
         <button
-  onClick={handleReserve}
-  disabled={vehicleId === ''}
-  style={{
-    width: '100%',
-    padding: '14px',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#fff',
-    background: vehicleId === '' ? '#aaa' : '#007bff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
-    opacity: vehicleId === '' ? 0.7 : 1,
-    transition: 'transform 0.1s ease, background-color 0.3s ease',
-  }}
-  // ✅ 押した時に少し縮む
-  onMouseDown={(e) => {
-    if (!vehicleId) return;      // ❌ 無効時は反応しない
-    e.currentTarget.style.transform = 'scale(0.95)';
-  }}
-  onMouseUp={(e) => {
-    e.currentTarget.style.transform = 'scale(1)';
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.transform = 'scale(1)'; // マウス外れた時も戻す
-  }}
->
-  🚆 この車を予約する
-</button>
-
+          onClick={handleReserve}
+          disabled={vehicleId === ''}
+          style={{
+            width: '100%',
+            padding: '14px',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#fff',
+            background: vehicleId === '' ? '#aaa' : '#007bff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
+            opacity: vehicleId === '' ? 0.7 : 1,
+            transition: 'transform 0.1s ease, background-color 0.3s ease',
+          }}
+          onMouseDown={(e) => {
+            if (!vehicleId) return;
+            e.currentTarget.style.transform = 'scale(0.95)';
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          🚆 この車を予約する
+        </button>
 
         {/* ✅ 予約番号（予約完了後だけ表示 & コピー可） */}
         {reservationId && (
@@ -351,24 +383,24 @@ export default function CalendarUi({ userId }: Props) {
               予約番号: {reservationId}
             </span>
             <button
-  onClick={copyReservationId}
-  style={{
-    marginLeft: '8px',
-    padding: '4px 8px',
-    fontSize: '14px',
-    cursor: 'pointer',
-    background: copied ? '#4caf50' : '#f0f0f0',   // ✅ コピー時は緑
-    color: copied ? '#fff' : '#000',
-    transition: 'transform 0.1s ease, background-color 0.3s ease',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-  }}
-  onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
-  onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')} // マウス外れた時も戻す
->
-  📋 コピー
-</button>
+              onClick={copyReservationId}
+              style={{
+                marginLeft: '8px',
+                padding: '4px 8px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                background: copied ? '#4caf50' : '#f0f0f0',
+                color: copied ? '#fff' : '#000',
+                transition: 'transform 0.1s ease, background-color 0.3s ease',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
+              onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              📋 コピー
+            </button>
           </div>
         )}
       </main>

@@ -80,3 +80,8 @@ input[type="date"]::-moz-focus-inner {
   transform: scale(0.9);
   background-color: #e0e0e0; /* クリック感を出すため少し暗く */
 }
+/* 万一 type=date が残っていても非表示にする */
+input[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+}

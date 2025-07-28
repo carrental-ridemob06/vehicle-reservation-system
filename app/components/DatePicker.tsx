@@ -1,84 +1,45 @@
-'use client'
-
-import { useEffect, useRef } from 'react'
-import flatpickr from 'flatpickr'
-import 'flatpickr/dist/flatpickr.min.css'
-import { Japanese } from 'flatpickr/dist/l10n/ja.js'
+'use client';
+import { useCallback } from 'react';
+import Flatpickr from 'react-flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
+import { Japanese } from 'flatpickr/dist/l10n/ja.js';
 
 type Props = {
-  label: string
-  value: string
-  onChange: (date: string) => void
-  minDate?: string
-  maxDate?: string
-  linkedStartDate?: string
-}
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  minDate?: string;
+  maxDate?: string;
+};
 
-// ✅ JST用フォーマット関数（UTCズレを防ぐ）
-function formatDateJST(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+const format = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate()
+  ).padStart(2, '0')}`;
 
-export default function DatePicker({ label, value, onChange, minDate, maxDate, linkedStartDate }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!inputRef.current) return
-
-    // ✅ Flatpickr 初期化（スマホ標準カレンダー封じるため text モードで）
-    const fp = flatpickr(inputRef.current, {
-      locale: { ...Japanese, firstDayOfWeek: 1 },
-      dateFormat: 'Y-m-d',
-      defaultDate: value || undefined,
-      minDate: linkedStartDate || minDate || 'today',
-      maxDate: maxDate || undefined,
-      disableMobile: true,   // ✅ ← これでスマホ標準カレンダーを完全にOFF！
-      onChange: (selectedDates) => {
-        if (selectedDates.length > 0) {
-          onChange(formatDateJST(selectedDates[0]))
-        }
-      },
-    })
-
-    return () => {
-      fp.destroy()
-    }
-  }, [value, minDate, maxDate, linkedStartDate])
+export default function DatePicker({ label, value, onChange, minDate, maxDate }: Props) {
+  const handleChange = useCallback(
+    (dates: Date[]) => dates[0] && onChange(format(dates[0])),
+    [onChange]
+  );
 
   return (
-    <div style={{ marginBottom: '14px' }}>
-      <label
-        style={{
-          display: 'block',
-          fontSize: '18px',
-          fontWeight: 'bold',
-          marginBottom: '6px',
-          color: '#333',
-          textAlign: 'left',
-        }}
-      >
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ fontWeight: 'bold', fontSize: 18, display: 'block', marginBottom: 6 }}>
         {label}
       </label>
 
-      {/* ✅ Flatpickr専用（スマホ標準カレンダーを封印） */}
-      <input
-        ref={inputRef}
-        type="text"            // ← dateではなくtext
-        inputMode="none"       // ← モバイルキーボードを出さない
-        autoComplete="off"     // ← キャッシュの候補を表示させない
-        defaultValue={value}
-        style={{
-          width: '100%',
-          padding: '12px',
-          fontSize: '18px',
-          border: '2px solid #999',
-          borderRadius: '8px',
-          boxSizing: 'border-box',
+      <Flatpickr
+        value={value}
+        onChange={handleChange}
+        options={{
+          locale: { ...Japanese, firstDayOfWeek: 1 },
+          dateFormat: 'Y-m-d',
+          minDate,
+          maxDate,
+          disableMobile: true, // ← スマホでも必ず Flatpickr
         }}
       />
     </div>
-  )
+  );
 }
