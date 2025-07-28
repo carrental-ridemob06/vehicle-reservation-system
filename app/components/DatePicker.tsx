@@ -28,6 +28,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
   useEffect(() => {
     if (!inputRef.current) return
 
+    // ✅ Flatpickr 初期化
     const fp = flatpickr(inputRef.current, {
       locale: { ...Japanese, firstDayOfWeek: 1 },
       dateFormat: 'Y-m-d',
@@ -36,8 +37,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
       maxDate: maxDate || undefined,
       onChange: (selectedDates) => {
         if (selectedDates.length > 0) {
-          // ✅ JSTの日付を渡す
-          onChange(formatDateJST(selectedDates[0]))
+          onChange(formatDateJST(selectedDates[0])) // ✅ JSTフォーマットで返す
         }
       },
     })
@@ -61,10 +61,11 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
       >
         {label}
       </label>
+
+      {/* ✅ Flatpickr専用。スマホ標準の date picker は使わない */}
       <input
         ref={inputRef}
-        type="text"
-        readOnly   // ✅ ← スマホでネイティブキーボードを出さない（Flatpickrのみ表示）
+        type="text"   // ← ここを必ず text にすることでスマホ標準カレンダーを封じる
         defaultValue={value}
         style={{
           width: '100%',
@@ -73,10 +74,9 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
           border: '2px solid #999',
           borderRadius: '8px',
           boxSizing: 'border-box',
-          backgroundColor: '#fff',  // ✅ タップ可能に見えるように
-          cursor: 'pointer'        // ✅ タップできる感を出す
         }}
       />
     </div>
   )
 }
+
