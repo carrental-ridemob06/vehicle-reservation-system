@@ -28,16 +28,17 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
   useEffect(() => {
     if (!inputRef.current) return
 
-    // ✅ Flatpickr 初期化
+    // ✅ Flatpickr 初期化（スマホ標準カレンダー封じるため text モードで）
     const fp = flatpickr(inputRef.current, {
       locale: { ...Japanese, firstDayOfWeek: 1 },
       dateFormat: 'Y-m-d',
       defaultDate: value || undefined,
       minDate: linkedStartDate || minDate || 'today',
       maxDate: maxDate || undefined,
+      disableMobile: true,   // ✅ ← これでスマホ標準カレンダーを完全にOFF！
       onChange: (selectedDates) => {
         if (selectedDates.length > 0) {
-          onChange(formatDateJST(selectedDates[0])) // ✅ JSTフォーマットで返す
+          onChange(formatDateJST(selectedDates[0]))
         }
       },
     })
@@ -62,10 +63,12 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
         {label}
       </label>
 
-      {/* ✅ Flatpickr専用。スマホ標準の date picker は使わない */}
+      {/* ✅ Flatpickr専用（スマホ標準カレンダーを封印） */}
       <input
         ref={inputRef}
-        type="text"   // ← ここを必ず text にすることでスマホ標準カレンダーを封じる
+        type="text"            // ← dateではなくtext
+        inputMode="none"       // ← モバイルキーボードを出さない
+        autoComplete="off"     // ← キャッシュの候補を表示させない
         defaultValue={value}
         style={{
           width: '100%',
@@ -79,4 +82,3 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
     </div>
   )
 }
-
