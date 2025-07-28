@@ -15,11 +15,10 @@
 }
 
 .dateInput {
-  width: 100%;
-  padding: 14px;
-  font-size: 18px;
+  width: 95% !important;         /* ✅ はみ出さない大きさに */
+  padding: 16px !important;      /* ✅ ちょっと大きめのパディング */
+  font-size: 20px !important;    /* ✅ 文字も見やすく */
   border: 2px solid #ccc;
   border-radius: 10px;
   box-sizing: border-box;
 }
-

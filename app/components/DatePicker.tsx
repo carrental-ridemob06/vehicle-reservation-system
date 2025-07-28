@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import Flatpickr from 'react-flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 import { Japanese } from 'flatpickr/dist/l10n/ja.js';
+import styles from './DatePicker.module.css';   // ✅ CSS Module を読み込む
 
 type Props = {
   label: string;
@@ -24,12 +25,11 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate }:
   );
 
   return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ fontWeight: 'bold', fontSize: 18, display: 'block', marginBottom: 6 }}>
-        {label}
-      </label>
+    <div className={styles.dateWrapper}>
+      <label className={styles.dateLabel}>{label}</label>
 
       <Flatpickr
+        className={styles.dateInput}   // ✅ CSS Module適用
         value={value}
         onChange={handleChange}
         options={{
@@ -37,7 +37,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate }:
           dateFormat: 'Y-m-d',
           minDate,
           maxDate,
-          disableMobile: true, // ← スマホでも必ず Flatpickr
+          disableMobile: true, // ✅ スマホでも必ず Flatpickr
         }}
       />
     </div>
