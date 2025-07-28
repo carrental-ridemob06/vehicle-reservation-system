@@ -1,0 +1,35 @@
+.dateWrapper {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.dateLabel {
+  display: block;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+/* ✅ 入力欄の文字を左寄せ */
+.dateInput {
+  width: 85%;
+  margin: 0 auto;
+  padding: 14px;
+  font-size: 20px;
+  font-weight: 600;
+  border: 2px solid #ccc;
+  border-radius: 12px;
+  text-align: left; /* ← ここも残す */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+
+
+.dateInput:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}

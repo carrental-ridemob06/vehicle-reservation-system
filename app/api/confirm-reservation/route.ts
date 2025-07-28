@@ -4,10 +4,11 @@ import { supabase } from '../../../lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
+    // ✅ フロントから reservation_id も受け取る
     const body = await req.json();
-    const { userId, vehicleId, startDate, endDate, option_child_seat, option_insurance } = body;
+    const { reservation_id, userId, vehicleId, startDate, endDate, option_child_seat, option_insurance } = body;
 
-    console.log('🔵 Confirm API Called:', { userId, vehicleId, startDate, endDate });
+    console.log('🔵 Confirm API Called:', { reservation_id, userId, vehicleId, startDate, endDate });
 
     // ✅ カレンダーID取得
     const calendarMap: Record<string, string> = {
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
       .from('reservations')
       .insert([
         {
+          reservation_id, // ✅ ← フロントの8桁IDをそのまま保存
           user_id: userId,
           vehicle_id: vehicleId,
           car_name: car.name,
@@ -133,7 +135,7 @@ export async function POST(req: NextRequest) {
           number_plate: car.number_plate,
           start_date: startDate,
           end_date: endDate,
-          planId: planLabel, // ✅ 同日なら「当日」
+          planId: planLabel,
           car_rental_price: Number(plan_price),
           option_price_1: Number(option_price_child_seat),
           option_price_2: Number(option_price_insurance),
@@ -171,7 +173,7 @@ export async function POST(req: NextRequest) {
           car.name || '',
           startDate || '',
           endDate || '',
-          planLabel || '',   // ✅ 「当日」または「◯泊」
+          planLabel || '',
           plan_price ?? 0,
           option_price_child_seat ?? 0,
           option_price_insurance ?? 0,
