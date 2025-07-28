@@ -36,7 +36,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
       maxDate: maxDate || undefined,
       onChange: (selectedDates) => {
         if (selectedDates.length > 0) {
-          // ✅ ここでtoISOString()をやめる
+          // ✅ JSTの日付を渡す
           onChange(formatDateJST(selectedDates[0]))
         }
       },
@@ -64,6 +64,7 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
       <input
         ref={inputRef}
         type="text"
+        readOnly   // ✅ ← スマホでネイティブキーボードを出さない（Flatpickrのみ表示）
         defaultValue={value}
         style={{
           width: '100%',
@@ -72,6 +73,8 @@ export default function DatePicker({ label, value, onChange, minDate, maxDate, l
           border: '2px solid #999',
           borderRadius: '8px',
           boxSizing: 'border-box',
+          backgroundColor: '#fff',  // ✅ タップ可能に見えるように
+          cursor: 'pointer'        // ✅ タップできる感を出す
         }}
       />
     </div>

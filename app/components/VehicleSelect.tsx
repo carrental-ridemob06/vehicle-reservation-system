@@ -7,7 +7,7 @@ type Props = {
 
 export default function VehicleSelect({ vehicleId, onChange }: Props) {
   return (
-    <div style={{ marginBottom: '16px' }}>
+    <div style={{ marginBottom: '14px' }}>
       <select
         value={vehicleId}
         onChange={(e) => onChange(e.target.value)}
