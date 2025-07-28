@@ -80,3 +80,9 @@ input[type="date"]::-moz-focus-inner {
   transform: scale(0.9);
   background-color: #e0e0e0; /* クリック感を出すため少し暗く */
 }
+input[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  z-index: -1;   /* Flatpickrを前面に */
+}
