@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
       .from('carrental')
       .insert([
         {
-          reservation_uuid: reservationId,
+          reservation_id: reservationId,
           user_id: userId,
           vehicle_id: vehicleId,
           car_name: car.name,

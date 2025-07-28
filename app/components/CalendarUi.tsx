@@ -7,9 +7,11 @@ import { useState, useEffect } from 'react'
 import VehicleSelect from '../components/VehicleSelect'
 import NightsDisplay from '../components/NightsDisplay'
 import DatePicker from '../components/DatePicker'
+
 // ✅ モーダル import
 import ConfirmModal from '../components/ConfirmModal'
 import ResultModal from '../components/ResultModal'
+import CopyModal from '../components/CopyModal'   // ✅ 追加
 
 type Props = {
   userId: string;
@@ -48,25 +50,38 @@ export default function CalendarUi({ userId }: Props) {
   }
 
   // ✅ 日付管理
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [nights, setNights] = useState(0)
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [nights, setNights] = useState(0);
 
+  // ✅ startDateを選んだら4日後まで終了日を制限（JST固定）
+  const maxEndDate = startDate
+    ? (() => {
+        const start = new Date(`${startDate}T00:00:00`);   // JSTの0時固定
+        start.setDate(start.getDate() + 4);
+        const y = start.getFullYear();
+        const m = String(start.getMonth() + 1).padStart(2, '0');
+        const d = String(start.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      })()
+    : undefined;
+
+  // ✅ 泊数計算（JST固定）
   useEffect(() => {
     if (startDate && endDate) {
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      let diff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-      // ✅ 同日予約 → 0泊表示
-      setNights(diff >= 0 ? diff : 0)
+      const start = new Date(`${startDate}T00:00:00`);   // JSTの0時
+      const end = new Date(`${endDate}T00:00:00`);       // JSTの0時
+      let diff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+      setNights(diff >= 0 ? diff : 0);
     } else {
-      setNights(0)
+      setNights(0);
     }
-  }, [startDate, endDate])
+  }, [startDate, endDate]);
 
   // ✅ モーダル管理
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [resultModalOpen, setResultModalOpen] = useState(false)
+  const [copyModalOpen, setCopyModalOpen] = useState(false)    // ✅ 追加
   const [modalMessage, setModalMessage] = useState('')
   const [modalAction, setModalAction] = useState<(() => void) | null>(null)
 
@@ -77,10 +92,22 @@ export default function CalendarUi({ userId }: Props) {
   // ✅ 予約ID（予約完了後だけ生成）
   const [reservationId, setReservationId] = useState('');
 
-  // ✅ 予約IDをコピーする関数
+  // ✅ コピー時のボタンアニメーション用
+  const [copied, setCopied] = useState(false);
+
+  // ✅ 予約IDをコピーする関数（alert → CopyModal）
   const copyReservationId = () => {
     navigator.clipboard.writeText(reservationId);
-    alert('✅ 予約番号をコピーしました: ' + reservationId);
+
+    // ✅ CopyModal に表示するメッセージ
+    setModalMessage(`📋 予約番号をコピーしました\n${reservationId}`);
+
+    // ✅ モーダル表示
+    setCopyModalOpen(true);
+
+    // ✅ ボタンの色変化アニメーション
+    setCopied(true);
+    setTimeout(() => setCopied(false), 500);
   };
 
   // ✅ 車両変更
@@ -89,7 +116,7 @@ export default function CalendarUi({ userId }: Props) {
     router.replace(`?user=${userId}&vehicle_id=${newId}`)
   }
 
-  // ✅ 予約処理
+  // ✅ 予約処理（既存ロジック）
   const handleReserve = async () => {
     if (!userId) {
       setModalMessage('❌ ログインしてください。')
@@ -106,17 +133,17 @@ export default function CalendarUi({ userId }: Props) {
 
     // ✅ 【JS側チェック】前日予約禁止
     const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1); // 翌日まで禁止
+    tomorrow.setDate(tomorrow.getDate() + 1);
     const selectedStart = new Date(startDate);
     if (selectedStart <= tomorrow) {
       setModalMessage('⚠️ 前日予約はできません。翌日以降を選択してください。');
-      setModalAction(null)
+      setModalAction(null);
       setResultModalOpen(true);
       return;
     }
 
     try {
-      // ✅ まず空き確認
+      // ✅ 空き確認
       const payload = { 
         userId, 
         vehicleId, 
@@ -124,33 +151,31 @@ export default function CalendarUi({ userId }: Props) {
         endDate,
         option_child_seat: childSeat,
         option_insurance: insurance
-      }
-      console.log('🟡 Check Availability Payload:', payload)
+      };
+      console.log('🟡 Check Availability Payload:', payload);
 
       const res = await fetch('/api/check-availability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      })
+      });
 
-      const data = await res.json()
-      console.log('🟢 Check Availability Response:', data)
+      const data = await res.json();
+      console.log('🟢 Check Availability Response:', data);
 
       if (!res.ok) {
-        setModalMessage(`❌ 予約不可: ${data.message}`)
-        setModalAction(null)
-        setResultModalOpen(true)
-        return
+        setModalMessage(`❌ 予約不可: ${data.message}`);
+        setModalAction(null);
+        setResultModalOpen(true);
+        return;
       }
 
       // ✅ 確認モーダル
       setModalMessage('✅ 空きあり！ このまま予約を確定しますか？')
       setModalAction(() => async () => {
-        // ✅ ここで予約番号を初めて生成
         const newReservationId = generateReservationId();
         setReservationId(newReservationId);
 
-        // ✅ Supabase / Sheet に送るpayload
         const confirmPayload = { 
           reservation_id: newReservationId,
           userId, 
@@ -195,7 +220,7 @@ export default function CalendarUi({ userId }: Props) {
 
   // ✅ UI側でも min 属性で前日をブロック
   const minDateObj = new Date();
-  minDateObj.setDate(minDateObj.getDate() + 3); // 今日 + 2日
+  minDateObj.setDate(minDateObj.getDate() + 2);
   const minSelectableDate = minDateObj.toISOString().substring(0, 10);
 
   return (
@@ -218,7 +243,7 @@ export default function CalendarUi({ userId }: Props) {
         <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden' }}>
           {vehicleId === '' ? (
             <iframe
-              src="https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&title=%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC&showTz=0&showTitle=0&src=Y2FycmVudGFsLnJpZGVtb2IwNkBnbWFpbC5jb20&src=M2RkNjNjZDliZmE4MmMyMDNmYWI2NTg1ZmU5NmZjODFhMDAyOTZhMmY5YTljZjFmZGIxNjJiNmQzYTc3NGYxM0Bncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=ODY5ZTcwMzg5ZDc4NGViNmQ5ZDllMzE4NmUyNzQxY2E2NzQ5MGY4ZmY4Nzc1YjhlOTY2NTExZjc4NDExNjY4NkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=ZTIyZTBiMGI2NGQ4MjQxY2EwZThlODMzNWQ1YzQwZjY4NTYwMzdmZGZiNzFiN2E1ZWI4YmJiNTNlMjM5NjA5OUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t&src=amEuamFwYW5lc2UjaG9saWRheUBncm91cC52LmNhbGVuZGFyLmdvb29nbGUuY29t&color=%23009688&color=%23039be5&color=%23ef6c00&color=%2333b679&color=%23e4c441"
+              src="https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&title=%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC&showTz=0&showTitle=0"
               style={{ width: '100%', height: '470px', border: 'none' }}
             />
           ) : (
@@ -229,49 +254,22 @@ export default function CalendarUi({ userId }: Props) {
           )}
         </div>
 
-       {/* 📆 日付入力 */}
-<div 
-  style={{ 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    gap: '16px',            // ✅ 開始日と終了日の間に余白
-    marginBottom: '20px', 
-    opacity: vehicleId === '' ? 0.5 : 1 
-  }}
->
-  <div style={{ flex: 1 }}>
-    <DatePicker
-      label="📅 開始日"
-      value={startDate}
-      onChange={(date) => {
-        setStartDate(date);
-        setEndDate('');
-      }}
-      minDate={minSelectableDate}
-      disabled={vehicleId === ''}
-    />
-  </div>
-
-  <div style={{ flex: 1 }}>
-    <DatePicker
-      label="📅 終了日"
-      value={endDate}
-      onChange={setEndDate}
-      minDate={startDate || minSelectableDate}
-      maxDate={
-        startDate
-          ? new Date(new Date(startDate).setDate(new Date(startDate).getDate() + 4))
-              .toISOString()
-              .split('T')[0]
-          : undefined
-      }
-      disabled={vehicleId === ''}
-    />
-  </div>
-</div>
-
-
-
+        {/* 📆 日付入力 */}
+        <div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
+          <DatePicker
+            label="📅 開始日"
+            value={startDate}
+            onChange={setStartDate}
+            minDate={minSelectableDate}
+          />
+          <DatePicker
+            label="📅 終了日"
+            value={endDate}
+            onChange={setEndDate}
+            minDate={startDate || minSelectableDate}
+            maxDate={maxEndDate}   // ✅ 4日後までしか選べない
+          />
+        </div>
 
         {/* 🌙 泊数 */}
         <div style={{
@@ -315,23 +313,36 @@ export default function CalendarUi({ userId }: Props) {
 
         {/* 🚆 予約ボタン */}
         <button
-          onClick={handleReserve}
-          disabled={vehicleId === ''}
-          style={{
-            width: '100%',
-            padding: '14px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            color: '#fff',
-            background: vehicleId === '' ? '#aaa' : '#007bff',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
-            opacity: vehicleId === '' ? 0.7 : 1
-          }}
-        >
-          🚆 この車を予約する
-        </button>
+  onClick={handleReserve}
+  disabled={vehicleId === ''}
+  style={{
+    width: '100%',
+    padding: '14px',
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#fff',
+    background: vehicleId === '' ? '#aaa' : '#007bff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
+    opacity: vehicleId === '' ? 0.7 : 1,
+    transition: 'transform 0.1s ease, background-color 0.3s ease',
+  }}
+  // ✅ 押した時に少し縮む
+  onMouseDown={(e) => {
+    if (!vehicleId) return;      // ❌ 無効時は反応しない
+    e.currentTarget.style.transform = 'scale(0.95)';
+  }}
+  onMouseUp={(e) => {
+    e.currentTarget.style.transform = 'scale(1)';
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.transform = 'scale(1)'; // マウス外れた時も戻す
+  }}
+>
+  🚆 この車を予約する
+</button>
+
 
         {/* ✅ 予約番号（予約完了後だけ表示 & コピー可） */}
         {reservationId && (
@@ -340,24 +351,29 @@ export default function CalendarUi({ userId }: Props) {
               予約番号: {reservationId}
             </span>
             <button
-              onClick={copyReservationId}
-              style={{
-                marginLeft: '8px',
-                padding: '4px 8px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                background: '#f0f0f0',
-                border: '1px solid #ccc',
-                borderRadius: '4px'
-              }}
-            >
-              📋 コピー
-            </button>
+  onClick={copyReservationId}
+  style={{
+    marginLeft: '8px',
+    padding: '4px 8px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    background: copied ? '#4caf50' : '#f0f0f0',   // ✅ コピー時は緑
+    color: copied ? '#fff' : '#000',
+    transition: 'transform 0.1s ease, background-color 0.3s ease',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+  }}
+  onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
+  onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')} // マウス外れた時も戻す
+>
+  📋 コピー
+</button>
           </div>
         )}
       </main>
 
-      {/* ✅ モーダル */}
+      {/* ✅ モーダル群 */}
       <ConfirmModal
         isOpen={confirmModalOpen}
         title="予約確認"
@@ -374,6 +390,13 @@ export default function CalendarUi({ userId }: Props) {
         message={modalMessage}
         onClose={() => setResultModalOpen(false)}
         confirmText="OK"
+      />
+
+      {/* ✅ CopyModal */}
+      <CopyModal
+        isOpen={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        message={modalMessage}
       />
     </div>
   )

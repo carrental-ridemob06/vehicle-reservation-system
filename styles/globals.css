@@ -71,3 +71,12 @@ input[type="date"]::-moz-focus-inner {
 .flatpickr-input {
   text-align: left !important;
 }
+/* 🔘 click-effect: 押したときに縮んで戻る */
+.click-effect {
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.click-effect:active {
+  transform: scale(0.9);
+  background-color: #e0e0e0; /* クリック感を出すため少し暗く */
+}

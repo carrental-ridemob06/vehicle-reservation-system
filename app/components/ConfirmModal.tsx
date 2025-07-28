@@ -68,20 +68,25 @@ export default function ConfirmModal({
           </button>
 
           <button
-            onClick={onConfirm}
-            style={{
-              flex: 1,
-              padding: '12px',
-              fontSize: '16px',
-              backgroundColor: '#007BFF',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            {confirmText}
-          </button>
+  onClick={onConfirm}
+  style={{
+    flex: 1,
+    padding: '12px',
+    fontSize: '16px',
+    backgroundColor: '#007BFF',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'transform 0.1s ease'  // ✅ 縮むアニメーションを追加
+  }}
+  onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'} // ✅ 押したとき縮む
+  onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}     // ✅ 離すと戻る
+  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}  // ✅ マウスが外れても戻す
+>
+  {confirmText}
+</button>
+
         </div>
       </div>
     </div>
