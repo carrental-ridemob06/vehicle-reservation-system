@@ -8,6 +8,7 @@ type ConfirmModalProps = {
   onCancel: () => void;
   confirmText?: string;
   cancelText?: string;
+  onClose?: () => void;   // ✅ モーダルを閉じる即時処理を呼べるよう追加（オプション）
 };
 
 export default function ConfirmModal({
@@ -17,9 +18,16 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   confirmText = 'OK',
-  cancelText = 'キャンセル'
+  cancelText = 'キャンセル',
+  onClose
 }: ConfirmModalProps) {
   if (!isOpen) return null;
+
+  // ✅ OKボタン押した時の即時閉じる処理
+  const handleConfirmClick = () => {
+    if (onClose) onClose();   // ✅ 呼び出し元で setConfirmModalOpen(false) を即座に実行
+    onConfirm();              // ✅ 予約確定処理はそのまま呼ぶ
+  };
 
   return (
     <div style={{
@@ -51,6 +59,7 @@ export default function ConfirmModal({
           justifyContent: 'space-between',
           gap: '10px'
         }}>
+          {/* キャンセルボタン */}
           <button
             onClick={onCancel}
             style={{
@@ -67,25 +76,26 @@ export default function ConfirmModal({
             {cancelText}
           </button>
 
+          {/* ✅ OKボタン（押した瞬間にモーダル閉じる） */}
           <button
-  onClick={onConfirm}
-  style={{
-    flex: 1,
-    padding: '12px',
-    fontSize: '16px',
-    backgroundColor: '#007BFF',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'transform 0.1s ease'  // ✅ 縮むアニメーションを追加
-  }}
-  onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'} // ✅ 押したとき縮む
-  onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}     // ✅ 離すと戻る
-  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}  // ✅ マウスが外れても戻す
->
-  {confirmText}
-</button>
+            onClick={handleConfirmClick}
+            style={{
+              flex: 1,
+              padding: '12px',
+              fontSize: '16px',
+              backgroundColor: '#007BFF',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'transform 0.1s ease'
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            {confirmText}
+          </button>
 
         </div>
       </div>

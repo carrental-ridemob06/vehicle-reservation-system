@@ -2,7 +2,10 @@
 
 type Vehicle = {
   car_no: string
+  manufacturer: string   // ✅ 追加
   name: string
+  model: string          // ✅ 追加
+  color: string          // ✅ 追加
   rank: string
   number_plate: string
   price_same_day: number
@@ -42,7 +45,10 @@ export default function VehicleTable({
       <thead>
         <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
           <th style={thStyle}>車両ID</th>
+          <th style={thStyle}>🏭 メーカー</th>     {/* ✅ 追加 */}
           <th style={thStyle}>車種名</th>
+          <th style={thStyle}>📆 年式</th>         {/* ✅ 追加 */}
+          <th style={thStyle}>🎨 色</th>           {/* ✅ 追加 */}
           <th style={thStyle}>ランク</th>
           <th style={thStyle}>ナンバー</th>
           <th style={thStyle}>当日価格</th>
@@ -57,7 +63,10 @@ export default function VehicleTable({
         {vehicles.map((v) => (
           <tr key={v.car_no} style={{ borderBottom: '1px solid #ddd' }}>
             <td style={tdStyle}>{v.car_no}</td>
+            <td style={tdStyle}>{v.manufacturer}</td> {/* ✅ 追加 */}
             <td style={tdStyle}>{v.name}</td>
+            <td style={tdStyle}>{v.model}</td>        {/* ✅ 追加 */}
+            <td style={tdStyle}>{v.color}</td>        {/* ✅ 追加 */}
             <td style={tdStyle}>{v.rank}</td>
             <td style={tdStyle}>{v.number_plate}</td>
             <td style={tdStyle}>{v.price_same_day}</td>
@@ -86,6 +95,7 @@ export default function VehicleTable({
   )
 }
 
+/* 🎨 スタイル */
 const thStyle: React.CSSProperties = {
   padding: '8px',
   borderBottom: '2px solid #ccc',

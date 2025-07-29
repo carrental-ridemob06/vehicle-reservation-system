@@ -12,9 +12,12 @@ type VehicleFormProps = {
 export default function VehicleForm({ vehicle, onClose, onSaved }: VehicleFormProps) {
   const [form, setForm] = useState({
     car_no: vehicle?.car_no || '',
+    manufacturer: vehicle?.manufacturer || '',   // ✅ メーカー
     name: vehicle?.name || '',
     rank: vehicle?.rank || '',
     number_plate: vehicle?.number_plate || '',
+    model: vehicle?.model || '',                 // ✅ 年式
+    color: vehicle?.color || '',                 // ✅ 色
     price_same_day: vehicle?.price_same_day || 0,
     price_1n: vehicle?.price_1n || 0,
     price_2n: vehicle?.price_2n || 0,
@@ -74,24 +77,59 @@ export default function VehicleForm({ vehicle, onClose, onSaved }: VehicleFormPr
         </h2>
 
         <div style={gridStyle}>
+
+          {/* ✅ 車両ID */}
           <label>🚗 車両ID</label>
           <input
             type="text"
             name="car_no"
             value={form.car_no}
             onChange={handleChange}
-            disabled={!!vehicle} // 編集時は変更不可
+            disabled={!!vehicle}
           />
 
+          {/* ✅ メーカー */}
+          <label>🏭 メーカー</label>
+          <input
+            type="text"
+            name="manufacturer"
+            value={form.manufacturer}
+            onChange={handleChange}
+          />
+
+          {/* ✅ 車種名 */}
           <label>📛 車種名</label>
           <input type="text" name="name" value={form.name} onChange={handleChange} />
 
+          {/* ✅ ランク */}
           <label>🏷 ランク</label>
           <input type="text" name="rank" value={form.rank} onChange={handleChange} />
 
+          {/* ✅ ナンバー */}
           <label>🔢 ナンバー</label>
           <input type="text" name="number_plate" value={form.number_plate} onChange={handleChange} />
 
+          {/* ✅ 年式 */}
+          <label>📆 年式</label>
+          <input
+            type="text"
+            name="model"
+            value={form.model}
+            onChange={handleChange}
+            placeholder="例：2023"
+          />
+
+          {/* ✅ 色 */}
+          <label>🎨 色</label>
+          <input
+            type="text"
+            name="color"
+            value={form.color}
+            onChange={handleChange}
+            placeholder="例：ホワイト"
+          />
+
+          {/* 💴 料金関係 */}
           <label>💴 当日価格</label>
           <input type="number" name="price_same_day" value={form.price_same_day} onChange={handleChange} />
 
@@ -107,6 +145,7 @@ export default function VehicleForm({ vehicle, onClose, onSaved }: VehicleFormPr
           <label>💴 4泊価格</label>
           <input type="number" name="price_4n" value={form.price_4n} onChange={handleChange} />
 
+          {/* 🎯 オプション */}
           <label>🎯 オプション価格1</label>
           <input type="number" name="option_price_1" value={form.option_price_1} onChange={handleChange} />
 
@@ -116,9 +155,11 @@ export default function VehicleForm({ vehicle, onClose, onSaved }: VehicleFormPr
           <label>🎯 オプション価格3</label>
           <input type="number" name="option_price_3" value={form.option_price_3} onChange={handleChange} />
 
+          {/* 📆 Googleカレンダー */}
           <label>📆 Google Calendar ID</label>
           <input type="text" name="calendar_id" value={form.calendar_id} onChange={handleChange} />
 
+          {/* 📝 備考 */}
           <label>📝 備考</label>
           <input type="text" name="notes" value={form.notes} onChange={handleChange} />
         </div>

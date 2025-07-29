@@ -3,19 +3,48 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
+// ✅ Supabaseクライアント
+import { createClient } from '@supabase/supabase-js'
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 // ✅ 切り出しコンポーネント
 import VehicleSelect from '../components/VehicleSelect'
 import NightsDisplay from '../components/NightsDisplay'
 import DatePicker from '../components/DatePicker'
+import ReservationConfirm from '../components/ReservationConfirm'
 
 // ✅ モーダル import
 import ConfirmModal from '../components/ConfirmModal'
 import ResultModal from '../components/ResultModal'
-import CopyModal from '../components/CopyModal'   // ✅ 追加
+import CopyModal from '../components/CopyModal'
 
 type Props = {
   userId: string;
-}
+  onReserveComplete?: (reservationId: string) => void;
+};
+
+// ✅ ReservationData 型を定義
+type ReservationData = {
+  reservation_id: string;
+  vehicle_id: string;
+  car_name: string;
+  rank: string;
+  number_plate: string;
+  manufacturer: string;
+  model: string;
+  color: string;
+  image_url_1?: string;
+  start_date: string;
+  end_date: string;
+  planId: string;
+  car_rental_price: number;
+  option_price_1: number;
+  option_price_2: number;
+  total_price: number;
+};
 
 // ✅ ランダムID生成関数（小文字英数字8桁）
 function generateReservationId() {
@@ -57,7 +86,7 @@ export default function CalendarUi({ userId }: Props) {
   // ✅ startDateを選んだら4日後まで終了日を制限（JST固定）
   const maxEndDate = startDate
     ? (() => {
-        const start = new Date(`${startDate}T00:00:00`);   // JSTの0時固定
+        const start = new Date(`${startDate}T00:00:00`);   
         start.setDate(start.getDate() + 4);
         const y = start.getFullYear();
         const m = String(start.getMonth() + 1).padStart(2, '0');
@@ -69,8 +98,8 @@ export default function CalendarUi({ userId }: Props) {
   // ✅ 泊数計算（JST固定）
   useEffect(() => {
     if (startDate && endDate) {
-      const start = new Date(`${startDate}T00:00:00`);   // JSTの0時
-      const end = new Date(`${endDate}T00:00:00`);       // JSTの0時
+      const start = new Date(`${startDate}T00:00:00`);
+      const end = new Date(`${endDate}T00:00:00`);
       let diff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
       setNights(diff >= 0 ? diff : 0);
     } else {
@@ -81,7 +110,7 @@ export default function CalendarUi({ userId }: Props) {
   // ✅ モーダル管理
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [resultModalOpen, setResultModalOpen] = useState(false)
-  const [copyModalOpen, setCopyModalOpen] = useState(false)    // ✅ 追加
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [modalMessage, setModalMessage] = useState('')
   const [modalAction, setModalAction] = useState<(() => void) | null>(null)
 
@@ -89,26 +118,21 @@ export default function CalendarUi({ userId }: Props) {
   const [childSeat, setChildSeat] = useState(false)
   const [insurance, setInsurance] = useState(false)
 
-  // ✅ 予約ID（予約完了後だけ生成）
+  // ✅ 予約ID
   const [reservationId, setReservationId] = useState('');
+  const [reservationData, setReservationData] = useState<any>(null);
 
-  // ✅ コピー時のボタンアニメーション用
+  // ✅ コピー時アニメーション
   const [copied, setCopied] = useState(false);
 
-  // ✅ タブ切り替え状態（📆 カレンダー or 🖊 日付入力）
+  // ✅ タブ切り替え
   const [tab, setTab] = useState<'calendar' | 'form'>('calendar');
 
-  // ✅ 予約IDをコピーする関数（alert → CopyModal）
+  // ✅ 予約IDをコピー
   const copyReservationId = () => {
     navigator.clipboard.writeText(reservationId);
-
-    // ✅ CopyModal に表示するメッセージ
     setModalMessage(`📋 予約番号をコピーしました\n${reservationId}`);
-
-    // ✅ モーダル表示
     setCopyModalOpen(true);
-
-    // ✅ ボタンの色変化アニメーション
     setCopied(true);
     setTimeout(() => setCopied(false), 500);
   };
@@ -120,107 +144,98 @@ export default function CalendarUi({ userId }: Props) {
   }
 
   // ✅ 予約処理
-  const handleReserve = async () => {
-    if (!userId) {
-      setModalMessage('❌ ログインしてください。')
-      setModalAction(null)
-      setResultModalOpen(true)
-      return
-    }
-    if (!startDate || !endDate) {
-      setModalMessage('📅 開始日と終了日を選択してください。')
-      setModalAction(null)
-      setResultModalOpen(true)
-      return
-    }
-
-    // ✅ 【JS側チェック】前日予約禁止
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const selectedStart = new Date(startDate);
-    if (selectedStart <= tomorrow) {
-      setModalMessage('⚠️ 前日予約はできません。翌日以降を選択してください。');
-      setModalAction(null);
-      setResultModalOpen(true);
-      return;
-    }
-
-    try {
-      // ✅ 空き確認
-      const payload = { 
-        userId, 
-        vehicleId, 
-        startDate, 
-        endDate,
-        option_child_seat: childSeat,
-        option_insurance: insurance
-      };
-      console.log('🟡 Check Availability Payload:', payload);
-
-      const res = await fetch('/api/check-availability', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      console.log('🟢 Check Availability Response:', data);
-
-      if (!res.ok) {
-        setModalMessage(`❌ 予約不可: ${data.message}`);
-        setModalAction(null);
-        setResultModalOpen(true);
-        return;
-      }
-
-      // ✅ 確認モーダル
-      setModalMessage('✅ 空きあり！ このまま予約を確定しますか？')
-      setModalAction(() => async () => {
-        const newReservationId = generateReservationId();
-        setReservationId(newReservationId);
-
-        const confirmPayload = { 
-          reservation_id: newReservationId,
-          userId, 
-          vehicleId, 
-          startDate, 
-          endDate,
-          option_child_seat: childSeat,
-          option_insurance: insurance
-        }
-
-        const confirmRes = await fetch('/api/confirm-reservation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(confirmPayload),
-        })
-
-        const confirmData = await confirmRes.json()
-        console.log('🟢 Confirm Reservation Response:', confirmData)
-
-        if (confirmRes.ok) {
-          setModalMessage(`✅ 予約が確定しました！\n予約番号: ${newReservationId}`)
-          setResultModalOpen(true)
-          setStartDate('')
-          setEndDate('')
-          setNights(0)
-          setChildSeat(false)
-          setInsurance(false)
-        } else {
-          setModalMessage(`❌ 予約確定エラー: ${confirmData.message}`)
-          setResultModalOpen(true)
-        }
-        setConfirmModalOpen(false)
-      })
-      setConfirmModalOpen(true)
-    } catch (err) {
-      console.error('⚡ ネットワークエラー:', err)
-      setModalMessage('⚡ ネットワークエラーが発生しました')
-      setModalAction(null)
-      setResultModalOpen(true)
-    }
+const handleReserve = async () => {
+  if (!userId) {
+    setModalMessage('❌ ログインしてください。')
+    setModalAction(null)
+    setResultModalOpen(true)
+    return
   }
 
+  if (!startDate || !endDate) {
+    setModalMessage('📅 開始日と終了日を選択してください。')
+    setModalAction(null)
+    setResultModalOpen(true)
+    return
+  }
+
+  try {
+    const newReservationId = generateReservationId()
+    setReservationId(newReservationId)
+
+    // ✅ APIに送信する予約データ
+const confirmPayload = {
+  reservation_id: newReservationId,
+  userId,
+  vehicleId,
+  startDate,
+  endDate,
+  option_child_seat: childSeat,
+  option_insurance: insurance
+}
+
+// ✅ API呼び出し
+const confirmRes = await fetch('/api/confirm-reservation', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(confirmPayload),
+})
+
+const confirmData = await confirmRes.json()
+console.log('🟢 Confirm Reservation Response:', confirmData)
+
+if (confirmRes.ok) {
+  setModalMessage(`✅ 予約が確定しました！\n予約番号: ${newReservationId}`)
+  setResultModalOpen(true)
+
+  // ✅ API から返却された予約データを state にセット
+  if (confirmData.reservation) {
+    console.log('📦 [CalendarUi] APIから取得した reservation を state へ:', confirmData.reservation)
+    setReservationData(confirmData.reservation)
+  }
+
+  // ✅ 入力値リセット
+  setStartDate('')
+  setEndDate('')
+  setNights(0)
+  setChildSeat(false)
+  setInsurance(false)
+
+  // ✅ carrental から予約詳細も取得（APIから足りない情報があった場合に補完用）
+  const { data: reservation } = await supabase
+    .from('carrental')
+    .select('reservation_id, start_date, end_date, total_price, car_name')
+    .eq('reservation_id', newReservationId)
+    .single()
+
+  if (reservation) {
+    console.log('📥 [CalendarUi] Supabase carrental から補完:', reservation)
+    setReservationData((prev: any) => ({
+      ...prev,  // APIからのデータを維持
+      reservationId: reservation.reservation_id,
+      car: reservation.car_name,
+      startDate: reservation.start_date,
+      endDate: reservation.end_date,
+      totalPrice: reservation.total_price,
+      imageUrl: prev?.imageUrl || null
+    }))
+  }
+
+} else {
+  setModalMessage(`❌ 予約確定エラー: ${confirmData.message}`)
+  setResultModalOpen(true)
+}
+
+setConfirmModalOpen(false)
+
+
+  } catch (err) {
+    console.error('⚡ ネットワークエラー:', err)
+    setModalMessage('⚡ ネットワークエラーが発生しました')
+    setModalAction(null)
+    setResultModalOpen(true)
+  }
+}
   // ✅ UI側でも min 属性で前日をブロック
   const minDateObj = new Date();
   minDateObj.setDate(minDateObj.getDate() + 2);
@@ -255,7 +270,6 @@ export default function CalendarUi({ userId }: Props) {
           >
             📆 空き状況
           </button>
-
           <button
             onClick={() => setTab('form')}
             style={{
@@ -269,7 +283,7 @@ export default function CalendarUi({ userId }: Props) {
           </button>
         </div>
 
-        {/* 📅 Googleカレンダー（tab=calendarのときのみ） */}
+        {/* 📅 Googleカレンダー */}
         {tab === 'calendar' && (
           <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden' }}>
             {vehicleId === '' ? (
@@ -286,7 +300,7 @@ export default function CalendarUi({ userId }: Props) {
           </div>
         )}
 
-        {/* 📆 日付入力（tab=formのときのみ） */}
+        {/* 📆 日付入力 */}
         {tab === 'form' && (
           <div style={{ marginBottom: '20px', opacity: vehicleId === '' ? 0.5 : 1 }}>
             <DatePicker
@@ -346,37 +360,31 @@ export default function CalendarUi({ userId }: Props) {
         </div>
 
         {/* 🚆 予約ボタン */}
-        <button
-          onClick={handleReserve}
-          disabled={vehicleId === ''}
-          style={{
-            width: '100%',
-            padding: '14px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            color: '#fff',
-            background: vehicleId === '' ? '#aaa' : '#007bff',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
-            opacity: vehicleId === '' ? 0.7 : 1,
-            transition: 'transform 0.1s ease, background-color 0.3s ease',
-          }}
-          onMouseDown={(e) => {
-            if (!vehicleId) return;
-            e.currentTarget.style.transform = 'scale(0.95)';
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          🚆 この車を予約する
-        </button>
+<button
+  onClick={handleReserve}
+  disabled={vehicleId === ''}
+  style={{
+    width: '100%',
+    padding: '14px',
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#fff',
+    background: vehicleId === '' ? '#aaa' : '#007bff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: vehicleId === '' ? 'not-allowed' : 'pointer',
+    opacity: vehicleId === '' ? 0.7 : 1,
+    transition: 'transform 0.15s ease, background-color 0.3s ease',
+  }}
+  onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+  onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+>
+  🚆 この車を予約する
+</button>
 
-        {/* ✅ 予約番号（予約完了後だけ表示 & コピー可） */}
+
+        {/* ✅ 予約番号 */}
         {reservationId && (
           <div style={{ marginTop: '12px', textAlign: 'center' }}>
             <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#222' }}>
@@ -391,18 +399,23 @@ export default function CalendarUi({ userId }: Props) {
                 cursor: 'pointer',
                 background: copied ? '#4caf50' : '#f0f0f0',
                 color: copied ? '#fff' : '#000',
-                transition: 'transform 0.1s ease, background-color 0.3s ease',
                 border: '1px solid #ccc',
                 borderRadius: '4px',
               }}
-              onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
-              onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               📋 コピー
             </button>
           </div>
         )}
+
+        {/* ✅ 予約確認画面 */}
+        {reservationData && (
+  <>
+    {console.log('📦 [CalendarUi] ReservationConfirm に渡すデータ:', reservationData)}
+    <ReservationConfirm reservation={reservationData} />
+  </>
+)}
+
       </main>
 
       {/* ✅ モーダル群 */}
@@ -424,7 +437,6 @@ export default function CalendarUi({ userId }: Props) {
         confirmText="OK"
       />
 
-      {/* ✅ CopyModal */}
       <CopyModal
         isOpen={copyModalOpen}
         onClose={() => setCopyModalOpen(false)}

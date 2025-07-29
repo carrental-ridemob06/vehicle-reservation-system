@@ -1,71 +1,55 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '../../../lib/supabase'
-import { getAccessToken } from '../../../lib/googleAuth'
+import { NextRequest, NextResponse } from 'next/server';
+import { google } from 'googleapis';
+import { cancelReservation } from '@/lib/cancelReservation';
+import { getAccessToken } from '@/lib/googleAuth';
+
+// ✅ Google Calendar イベント削除関数
+async function deleteCalendarEvent(calendarEventId: string) {
+  try {
+    const calendar = google.calendar({ version: 'v3' });
+
+    await calendar.events.delete({
+      calendarId: process.env.GOOGLE_CALENDAR_ID!, // ✅ 環境変数で管理
+      eventId: calendarEventId,
+      auth: new google.auth.JWT({
+        email: process.env.GOOGLE_CLIENT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        scopes: ['https://www.googleapis.com/auth/calendar'],
+      }),
+    });
+
+    console.log(`✅ Googleカレンダー削除成功: ${calendarEventId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('🔴 Googleカレンダー削除失敗:', error);
+    return { success: false, error };
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const { reservation_id, cancel_reason } = await req.json()
-    console.log('🛑 キャンセルAPI呼び出し:', { reservation_id, cancel_reason })
-
-    // ✅ Supabaseから予約情報を取得
-    const { data, error } = await supabase
-      .from('carrental')
-      .select('calendar_event_id, vehicle_id')
-      .eq('id', reservation_id)
-      .single()
-
-    if (error || !data) {
-      console.error('🚨 予約が見つかりません', error)
-      return NextResponse.json({ message: '予約が見つかりません' }, { status: 404 })
+    const { reservationId, calendarEventId } = await req.json();
+    if (!reservationId) {
+      return NextResponse.json({ error: 'reservationId が必要です' }, { status: 400 });
     }
 
-    const { calendar_event_id, vehicle_id } = data
+    console.log(`🚨 手動キャンセルAPI呼び出し: ${reservationId}`);
 
-    // ✅ 車両ごとのカレンダーIDをマッピング
-    const calendarMap: Record<string, string> = {
-      car01: process.env.CAR01_CALENDAR_ID!,
-      car02: process.env.CAR02_CALENDAR_ID!,
-      car03: process.env.CAR03_CALENDAR_ID!,
-    }
-    const calendarId = calendarMap[vehicle_id]
-
-    // ✅ Googleカレンダーからイベント削除
-    try {
-      const token = await getAccessToken()
-      await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${calendar_event_id}`,
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
-      )
-      console.log(`✅ Googleカレンダーイベント削除成功: ${calendar_event_id}`)
-    } catch (googleError) {
-      console.error('🚨 Googleカレンダー削除エラー', googleError)
-      // カレンダー削除失敗しても処理は続ける
+    // ✅ Googleカレンダー削除（eventIdが送られてきた場合のみ）
+    if (calendarEventId) {
+      await deleteCalendarEvent(calendarEventId);
     }
 
-    // ✅ Supabaseの予約ステータスを canceled に更新
-    const { error: updateError } = await supabase
-      .from('carrental')
-      .update({
-        status: 'canceled',
-        payment_status: 'refunded', // ClickPAY側で返金済み想定
-        refund_reason: cancel_reason || 'ClickPAY refund',
-      })
-      .eq('id', reservation_id)
+    // ✅ Supabase側の予約キャンセル（lib/cancelReservation.ts を使用）
+    const result = await cancelReservation(reservationId, 'manual-cancel');
 
-    if (updateError) {
-      console.error('🚨 Supabase 更新エラー', updateError)
-      return NextResponse.json({ message: 'DB更新に失敗しました' }, { status: 500 })
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    console.log(`✅ Supabase予約更新完了: ID=${reservation_id}`)
-
-    return NextResponse.json({ 
-      message: '✅ 予約をキャンセルしました',
-      reservation_id
-    })
-
+    return NextResponse.json({ message: 'キャンセル完了', reservationId });
   } catch (err) {
-    console.error('🔥 Cancel API エラー:', err)
-    return NextResponse.json({ message: '❌ サーバーエラー' }, { status: 500 })
+    console.error('🔴 APIエラー:', err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

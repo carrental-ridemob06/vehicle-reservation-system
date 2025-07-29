@@ -11,8 +11,9 @@ export default function AdminMenu() {
         display: 'flex',
         justifyContent: 'center',
         gap: '30px',
+        flexWrap: 'wrap',
       }}>
-        {/* 🚗 車両管理ボタン */}
+        {/* 🚗 車両管理 */}
         <Link href="/admin/vehicles">
           <div style={cardStyle}>
             <h2 style={cardTitle}>🚗 車両管理システム</h2>
@@ -20,11 +21,27 @@ export default function AdminMenu() {
           </div>
         </Link>
 
-        {/* 📅 カレンダー管理ボタン */}
+        {/* 📅 カレンダー管理 */}
         <Link href="/admin/calendar">
           <div style={cardStyle}>
             <h2 style={cardTitle}>📅 カレンダー管理システム</h2>
             <p style={cardDesc}>Googleカレンダー予約の管理</p>
+          </div>
+        </Link>
+
+        {/* ✅ 予約管理 */}
+        <Link href="/admin/reservations">
+          <div style={cardStyle}>
+            <h2 style={cardTitle}>✅ 予約管理システム</h2>
+            <p style={cardDesc}>予約一覧・手動キャンセル</p>
+          </div>
+        </Link>
+
+        {/* 📜 システムログ ← 追加済み */}
+        <Link href="/admin/logs">
+          <div style={cardStyle}>
+            <h2 style={cardTitle}>📜 システムログ</h2>
+            <p style={cardDesc}>自動/手動キャンセル履歴とエラー</p>
           </div>
         </Link>
       </div>
@@ -42,15 +59,15 @@ const cardStyle: React.CSSProperties = {
   cursor: 'pointer',
   transition: '0.3s',
   textAlign: 'center',
-}
+};
 
 const cardTitle: React.CSSProperties = {
   fontSize: '20px',
   fontWeight: 'bold',
   marginBottom: '10px',
-}
+};
 
 const cardDesc: React.CSSProperties = {
   fontSize: '14px',
   color: '#555',
-}
+};
