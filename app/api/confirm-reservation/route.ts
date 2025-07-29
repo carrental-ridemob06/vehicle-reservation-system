@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     const start = new Date(startDate);
     const end = new Date(endDate);
     let days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
     if (sameDay) {
       days = 0;
     } else if (days <= 0) {
@@ -43,18 +44,32 @@ export async function POST(req: NextRequest) {
     }
     console.log('📆 泊数計算:', { sameDay, days });
 
-    // ✅ 料金計算
+    // ✅ 料金計算（泊数ごとに価格を振り分け）
     let plan_price: number;
     let planLabel: string;
+
     if (sameDay) {
       plan_price = car.price_same_day;
       planLabel = '当日';
-    } else {
+    } else if (days === 1) {
       plan_price = car.price_1n;
+      planLabel = '1泊';
+    } else if (days === 2) {
+      plan_price = car.price_2n;
+      planLabel = '2泊';
+    } else if (days === 3) {
+      plan_price = car.price_3n;
+      planLabel = '3泊';
+    } else {
+      plan_price = car.price_4n;  // ✅ 4泊以上は4泊料金を適用
       planLabel = `${days}泊`;
     }
+
+    // ✅ オプション料金（泊数分を加算）
     const option_price_child_seat = option_child_seat ? car.option_price_1 * (sameDay ? 1 : days) : 0;
     const option_price_insurance = option_insurance ? car.option_price_2 * (sameDay ? 1 : days) : 0;
+
+    // ✅ 合計
     const total_price = plan_price + option_price_child_seat + option_price_insurance;
 
     console.log('💴 料金計算:', { plan_price, planLabel, option_price_child_seat, option_price_insurance, total_price });
