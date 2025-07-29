@@ -173,6 +173,27 @@ export async function POST(req: NextRequest) {
       console.error('🚨 carrental Insert Error:', carrentalError);
     }
 
+    // ✅ ✅ ✅ ここで system_logs に書き込み
+    await supabase
+      .from('system_logs')
+      .insert([
+        {
+          action: 'reservation_created',
+          reservation_id: reservationId,
+          details: JSON.stringify({
+            vehicleId,
+            userId,
+            startDate,
+            endDate,
+            option_child_seat,
+            option_insurance,
+            total_price
+          }),
+          created_at: new Date().toISOString()
+        }
+      ]);
+    console.log('🟢 system_logs に書き込み完了');
+
     // ✅ 返すデータをまとめる
     const responsePayload = {
       reservation_id: reservationId,

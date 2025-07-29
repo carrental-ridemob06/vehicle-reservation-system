@@ -24,28 +24,63 @@ export async function GET() {
 
     if (error) {
       console.error('🔴 Supabase 取得エラー:', error);
+      await supabase.from('system_logs').insert([
+        { action: 'auto-cancel-error', details: `Supabase取得失敗: ${error.message}` }
+      ]);
       return NextResponse.json({ error: '予約の取得に失敗' }, { status: 500 });
     }
 
     if (!pendingReservations || pendingReservations.length === 0) {
       console.log('✅ 自動キャンセル対象なし');
+      await supabase.from('system_logs').insert([
+        { action: 'auto-cancel-check', details: '対象0件' }
+      ]);
       return NextResponse.json({ message: '対象なし', count: 0 });
     }
 
     console.log(`🚨 対象予約数: ${pendingReservations.length}`);
+    await supabase.from('system_logs').insert([
+      { action: 'auto-cancel-check', details: `対象 ${pendingReservations.length}件` }
+    ]);
 
     // ✅ キャンセル処理を順番に実行
     const results = [];
     for (const reservation of pendingReservations) {
-      const res = await cancelReservation(reservation.id, 'auto-cancel');
-      results.push({ id: reservation.id, ...res });
+      try {
+        console.log(`🔵 キャンセル処理開始: ID=${reservation.id}`);
+        await supabase.from('system_logs').insert([
+          { action: 'auto-cancel-start', reservation_id: reservation.id }
+        ]);
+
+        // 🔥 実際のキャンセル関数を呼び出す
+        const res = await cancelReservation(reservation.id, 'auto-cancel');
+        results.push({ id: reservation.id, ...res });
+
+        console.log(`✅ キャンセル成功: ID=${reservation.id}`);
+        await supabase.from('system_logs').insert([
+          { action: 'auto-cancel-success', reservation_id: reservation.id, details: 'キャンセル成功' }
+        ]);
+
+      } catch (err) {
+        console.error(`❌ キャンセル失敗: ID=${reservation.id}`, err);
+        await supabase.from('system_logs').insert([
+          { action: 'auto-cancel-error', reservation_id: reservation.id, details: String(err) }
+        ]);
+      }
     }
 
     console.log(`✅ 自動キャンセル完了: ${results.length}件`);
+    await supabase.from('system_logs').insert([
+      { action: 'auto-cancel-finish', details: `完了: ${results.length}件` }
+    ]);
+
     return NextResponse.json({ message: '自動キャンセル完了', count: results.length, results });
 
   } catch (err) {
     console.error('🔴 自動キャンセルAPIエラー:', err);
+    await supabase.from('system_logs').insert([
+      { action: 'auto-cancel-fatal', details: String(err) }
+    ]);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
