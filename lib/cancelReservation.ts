@@ -1,15 +1,11 @@
-// ✅ lib/cancelReservation.ts
 import { createClient } from '@supabase/supabase-js';
-import { deleteCalendarEvent } from './googleCalendar';
+import { deleteCalendarEvent } from './deleteCalendarEvent';
 
 // ✅ Supabase クライアント
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
-// ✅ 車両キー型を定義
-type VehicleKey = 'car01' | 'car02' | 'car03';
 
 /**
  * 予約キャンセル共通処理
@@ -23,53 +19,42 @@ export async function cancelReservation(reservationId: string, reason: string = 
     // ① carrental から予約情報を取得
     const { data: reservation, error: fetchError } = await supabase
       .from('carrental')
-      .select('id, vehicle_id, calendar_event_id, status')
-      .eq('id', reservationId) // idベースで検索
+      .select('id, calendar_event_id, vehicle_id, status')
+      .eq('id', reservationId)
       .single();
 
     if (fetchError || !reservation) {
       console.error('🔴 carrental 取得エラー:', fetchError);
+      await supabase.from('system_logs').insert([
+        { action: 'cancel-fetch-error', reservation_id: reservationId, details: fetchError?.message || '予約が見つかりません' }
+      ]);
       return { success: false, error: '予約が見つかりません' };
     }
 
     // ② すでにキャンセル済みなら何もしない
     if (reservation.status === 'canceled') {
       console.log('⚠️ 既にキャンセル済み');
+      await supabase.from('system_logs').insert([
+        { action: 'already-canceled', reservation_id: reservationId }
+      ]);
       return { success: true, message: '既にキャンセルされています' };
     }
 
-    // ✅ 車両ごとのカレンダーIDマップ（型定義）
-    const calendarMap: Record<VehicleKey, string> = {
-      car01: process.env.CAR01_CALENDAR_ID!,
-      car02: process.env.CAR02_CALENDAR_ID!,
-      car03: process.env.CAR03_CALENDAR_ID!,
-    };
-
-    // ✅ reservation.vehicle_id が 'car01' | 'car02' | 'car03' であることを保証
-    const vehicleKey = reservation.vehicle_id as VehicleKey;
-    const calendarId = calendarMap[vehicleKey];
-
     // ③ Googleカレンダー削除（イベントIDがあれば）
-    if (calendarId && reservation.calendar_event_id) {
-      try {
-        console.log(`📆 Googleカレンダー削除: ${reservation.calendar_event_id}`);
-        await deleteCalendarEvent(calendarId, reservation.calendar_event_id);
+    if (reservation.calendar_event_id) {
+      // ✅ ここで throw しない → 処理は続ける
+      const deleted = await deleteCalendarEvent(
+        process.env[`CAR${reservation.vehicle_id.slice(-2)}_CALENDAR_ID`] || '',
+        reservation.calendar_event_id
+      );
 
-        // ✅ system_logsに削除成功を記録
-        await supabase.from('system_logs').insert([{
-          action: 'google-event-deleted',
+      await supabase.from('system_logs').insert([
+        {
+          action: deleted ? 'google-event-deleted' : 'google-event-delete-error',
           reservation_id: reservationId,
-          details: { calendar_event_id: reservation.calendar_event_id }
-        }]);
-
-      } catch (err) {
-        console.error('🔴 Googleカレンダー削除エラー:', err);
-        await supabase.from('system_logs').insert([{
-          action: 'google-event-delete-error',
-          reservation_id: reservationId,
-          details: String(err)
-        }]);
-      }
+          details: deleted ? 'イベント削除成功' : 'Google API エラー（処理続行）'
+        }
+      ]);
     }
 
     // ④ Supabase carrental をキャンセル状態に更新
@@ -83,21 +68,29 @@ export async function cancelReservation(reservationId: string, reason: string = 
 
     if (updateError) {
       console.error('🔴 carrental 更新エラー:', updateError);
+      await supabase.from('system_logs').insert([
+        { action: 'carrental-update-error', reservation_id: reservationId, details: updateError.message }
+      ]);
       return { success: false, error: '予約のステータス更新に失敗しました' };
     }
 
-    // ⑤ Supabase system_logs に記録
-    await supabase.from('system_logs').insert([{
-      action: reason,
-      reservation_id: reservationId,
-      details: { calendar_event_id: reservation.calendar_event_id }
-    }]);
+    // ⑤ system_logs にキャンセル完了を記録
+    await supabase.from('system_logs').insert([
+      {
+        action: reason,
+        reservation_id: reservationId,
+        details: 'キャンセル完了'
+      }
+    ]);
 
     console.log(`✅ キャンセル完了: ${reservationId}`);
     return { success: true, message: 'キャンセル完了' };
 
   } catch (error) {
     console.error('🔴 cancelReservation 処理エラー:', error);
+    await supabase.from('system_logs').insert([
+      { action: 'cancel-fatal', reservation_id: reservationId, details: String(error) }
+    ]);
     return { success: false, error: String(error) };
   }
 }
