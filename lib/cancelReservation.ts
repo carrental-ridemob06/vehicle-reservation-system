@@ -1,47 +1,65 @@
 // ✅ lib/cancelReservation.ts
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
+import { google } from 'googleapis'
+import { getAccessToken } from './googleAuth'
 
-// ✅ Supabase クライアント
+// ✅ Supabase Service Role で接続（削除もあるので service_key 必須）
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 /**
  * 予約キャンセル共通処理
- * @param reservationId 予約ID（または id）
+ * @param reservationId carrental.id（または reservation_id）
  * @param reason 'auto-cancel' | 'manual-cancel'
  */
 export async function cancelReservation(reservationId: string, reason: string = 'manual-cancel') {
   try {
-    console.log(`🚨 キャンセル処理開始: ${reservationId} (${reason})`);
+    console.log(`🚨 キャンセル処理開始: ${reservationId} (${reason})`)
 
     // ① carrental から予約情報を取得
     const { data: reservation, error: fetchError } = await supabase
       .from('carrental')
-      .select('id, calendar_event_id, status')
-      .eq('id', reservationId) // idベースで検索（reservation_idがあれば変更可能）
-      .single();
+      .select('id, calendar_event_id, status, vehicle_id')
+      .eq('id', reservationId)
+      .single()
 
     if (fetchError || !reservation) {
-      console.error('🔴 carrental 取得エラー:', fetchError);
-      return { success: false, error: '予約が見つかりません' };
+      console.error('🔴 carrental 取得エラー:', fetchError)
+      return { success: false, error: '予約が見つかりません' }
     }
 
-    // ② すでにキャンセル済みなら何もしない
+    // ② すでにキャンセル済みならスキップ
     if (reservation.status === 'canceled') {
-      console.log('⚠️ 既にキャンセル済み');
-      return { success: true, message: '既にキャンセルされています' };
+      console.log('⚠️ 既にキャンセル済み')
+      return { success: true, message: '既にキャンセルされています' }
     }
 
-    // ③ Googleカレンダー削除（イベントIDがあれば）
+    // ③ Googleカレンダーのイベント削除
     if (reservation.calendar_event_id) {
       try {
-        // Google API呼び出し部分は仮置き（googleAuth.tsを利用予定）
-        console.log(`📆 Googleカレンダー削除: ${reservation.calendar_event_id}`);
-        // await deleteCalendarEvent(reservation.calendar_event_id);
+        const auth = await getAccessToken()
+        const calendar = google.calendar({ version: 'v3', auth })
+
+        // ✅ 車ごとのカレンダーIDマップ
+        const calendarMap = {
+          car01: process.env.CAR01_CALENDAR_ID!,
+          car02: process.env.CAR02_CALENDAR_ID!,
+          car03: process.env.CAR03_CALENDAR_ID!,
+        }
+
+        const calendarId = calendarMap[reservation.vehicle_id as keyof typeof calendarMap]
+
+        if (calendarId) {
+          await calendar.events.delete({
+            calendarId,
+            eventId: reservation.calendar_event_id
+          })
+          console.log(`📆 Googleカレンダー削除完了: ${reservation.calendar_event_id}`)
+        }
       } catch (err) {
-        console.error('🔴 Googleカレンダー削除エラー:', err);
+        console.error('🔴 Googleカレンダー削除エラー:', err)
       }
     }
 
@@ -52,14 +70,14 @@ export async function cancelReservation(reservationId: string, reason: string = 
         status: 'canceled',
         payment_status: 'expired'
       })
-      .eq('id', reservationId);
+      .eq('id', reservationId)
 
     if (updateError) {
-      console.error('🔴 carrental 更新エラー:', updateError);
-      return { success: false, error: '予約のステータス更新に失敗しました' };
+      console.error('🔴 carrental 更新エラー:', updateError)
+      return { success: false, error: '予約のステータス更新に失敗しました' }
     }
 
-    // ⑤ Supabase system_logs に記録
+    // ⑤ system_logs に記録
     await supabase.from('system_logs').insert([
       {
         action: reason,
@@ -67,13 +85,13 @@ export async function cancelReservation(reservationId: string, reason: string = 
         details: { calendar_event_id: reservation.calendar_event_id },
         created_at: new Date().toISOString()
       }
-    ]);
+    ])
 
-    console.log(`✅ キャンセル完了: ${reservationId}`);
-    return { success: true, message: 'キャンセル完了' };
+    console.log(`✅ キャンセル完了: ${reservationId}`)
+    return { success: true, message: 'キャンセル完了' }
 
   } catch (error) {
-    console.error('🔴 cancelReservation 処理エラー:', error);
-    return { success: false, error: String(error) };
+    console.error('🔴 cancelReservation 処理エラー:', error)
+    return { success: false, error: String(error) }
   }
 }

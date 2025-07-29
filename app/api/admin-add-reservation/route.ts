@@ -2,19 +2,24 @@ import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { getAccessToken } from '../../../lib/googleAuth'
 import { carConfig } from '../../../lib/carConfig'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 export async function POST(req: Request) {
   try {
     const { vehicleId, startDate, endDate, colorId, title } = await req.json()
 
-    // ✅ 車ごとのカレンダーIDマップ
+    // ✅ カレンダーIDマップ
     const calendarMap = {
-      car01: process.env.CAR01_CALENDAR_ID,
-      car02: process.env.CAR02_CALENDAR_ID,
-      car03: process.env.CAR03_CALENDAR_ID,
+      car01: process.env.CAR01_CALENDAR_ID!,
+      car02: process.env.CAR02_CALENDAR_ID!,
+      car03: process.env.CAR03_CALENDAR_ID!,
     }
 
-    // ✅ 車ごとにカレンダーIDを自動選択
     const calendarId = calendarMap[vehicleId as keyof typeof calendarMap]
     if (!calendarId) {
       throw new Error('❌ カレンダーIDが見つかりません')
@@ -24,30 +29,54 @@ export async function POST(req: Request) {
     const auth = await getAccessToken()
     const calendar = google.calendar({ version: 'v3', auth })
 
-    // ✅ 車ごとの基本設定を読み込み
+    // ✅ 車ごとの設定
     const carDefaults = carConfig[vehicleId as keyof typeof carConfig] || { default_color: '8', default_title: '🚘 未設定車両' }
-
-    // ✅ タイトル＆色を決定（入力があれば上書き）
     const eventTitle = title || `【管理者追加】${carDefaults.default_title}`
     const eventColor = colorId || carDefaults.default_color
 
-    // ✅ 終了日を +1日する（Google Calendar の仕様対応）
+    // ✅ 終了日 +1日（Google Calendar 仕様）
     const endDateObj = new Date(endDate)
     endDateObj.setDate(endDateObj.getDate() + 1)
-    const adjustedEndDate = endDateObj.toISOString().split('T')[0] // YYYY-MM-DD形式
+    const adjustedEndDate = endDateObj.toISOString().split('T')[0]
 
-    // ✅ Google Calendar に予約登録
+    // ✅ Google Calendar 登録
     const event = await calendar.events.insert({
-      calendarId: calendarId,
+      calendarId,
       requestBody: {
         summary: eventTitle,
         start: { date: startDate },
-        end: { date: adjustedEndDate },  // ✅ +1日した終了日
+        end: { date: adjustedEndDate },
         colorId: eventColor,
       },
     })
 
-    return NextResponse.json({ result: 'success', event: event.data })
+    // ✅ system_logs に記録
+    await supabase.from('system_logs').insert([
+      {
+        action: 'admin_reservation_added',
+        reservation_id: null,
+        details: {
+          vehicleId,
+          startDate,
+          endDate,
+          title: eventTitle,
+          colorId: eventColor,
+        },
+        created_at: new Date().toISOString(),
+      }
+    ])
+
+    return NextResponse.json({
+      result: 'success',
+      event: {
+        id: event.data.id,
+        summary: event.data.summary,
+        start: event.data.start,
+        end: event.data.end,
+        colorId: event.data.colorId,
+      }
+    })
+
   } catch (error) {
     console.error('❌ Admin reservation error:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
