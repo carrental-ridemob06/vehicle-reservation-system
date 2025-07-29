@@ -284,21 +284,35 @@ setConfirmModalOpen(false)
         </div>
 
         {/* 📅 Googleカレンダー */}
-        {tab === 'calendar' && (
-          <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden' }}>
-            {vehicleId === '' ? (
-              <iframe
-                src="https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&title=%E3%83%AC%E3%83%B3%E3%82%BF%E3%82%AB%E3%83%BC&showTz=0&showTitle=0"
-                style={{ width: '100%', height: '470px', border: 'none' }}
-              />
-            ) : (
-              <iframe
-                src={`https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&showTz=0&showTitle=0&src=${calendarMap[vehicleId]}&color=${colorMap[vehicleId]}`}
-                style={{ width: '100%', height: '350px', border: 'none' }}
-              />
-            )}
-          </div>
-        )}
+{tab === 'calendar' && (
+  <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden' }}>
+    {vehicleId === '' ? (
+      // ✅ 車が未選択 → 総合カレンダー表示
+<iframe
+  src="https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&showTitle=0&src=3dd63cd9bfa82c203fab6585fe96fc81a00296a2f9a9cf1fdb162b6d3a774f13@group.calendar.google.com&src=869e70389d784eb6d9d9e3186e2741ca67490f8ff8775b8e966511f784116686@group.calendar.google.com&src=e22e0b0b64d8241ca0e8e8335d5c40f6856037fdfb71b7a5eb8bbb53e2396099@group.calendar.google.com&color=%23039be5&color=%23ef6c00&color=%237cb342"
+  style={{ borderWidth: 0, width: '100%', height: '470px', border: 'none' }}
+  frameBorder="0"
+  scrolling="no"
+/>
+
+
+
+    ) : (
+      // ✅ 車両が選択されている → その車両だけ表示
+      <iframe
+        src={`https://calendar.google.com/calendar/embed?height=600&wkst=2&ctz=Asia%2FTokyo&showPrint=0&showTitle=0&showTabs=0&showCalendars=0
+          &src=${calendarMap[vehicleId]}&color=${colorMap[vehicleId]}`}
+        style={{ borderWidth: 0, width: '100%', height: '470px', border: 'none' }}
+        frameBorder="0"
+        scrolling="no"
+      />
+    )}
+  </div>
+)}
+
+
+
+
 
         {/* 📆 日付入力 */}
         {tab === 'form' && (
