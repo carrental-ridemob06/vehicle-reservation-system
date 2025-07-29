@@ -1,65 +1,74 @@
 // ✅ lib/cancelReservation.ts
-import { createClient } from '@supabase/supabase-js'
-import { google } from 'googleapis'
-import { getAccessToken } from './googleAuth'
+import { createClient } from '@supabase/supabase-js';
+import { deleteCalendarEvent } from './googleCalendar';
 
-// ✅ Supabase Service Role で接続（削除もあるので service_key 必須）
+// ✅ Supabase クライアント
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+// ✅ 車両キー型を定義
+type VehicleKey = 'car01' | 'car02' | 'car03';
 
 /**
  * 予約キャンセル共通処理
- * @param reservationId carrental.id（または reservation_id）
+ * @param reservationId 予約ID（または id）
  * @param reason 'auto-cancel' | 'manual-cancel'
  */
 export async function cancelReservation(reservationId: string, reason: string = 'manual-cancel') {
   try {
-    console.log(`🚨 キャンセル処理開始: ${reservationId} (${reason})`)
+    console.log(`🚨 キャンセル処理開始: ${reservationId} (${reason})`);
 
     // ① carrental から予約情報を取得
     const { data: reservation, error: fetchError } = await supabase
       .from('carrental')
-      .select('id, calendar_event_id, status, vehicle_id')
-      .eq('id', reservationId)
-      .single()
+      .select('id, vehicle_id, calendar_event_id, status')
+      .eq('id', reservationId) // idベースで検索
+      .single();
 
     if (fetchError || !reservation) {
-      console.error('🔴 carrental 取得エラー:', fetchError)
-      return { success: false, error: '予約が見つかりません' }
+      console.error('🔴 carrental 取得エラー:', fetchError);
+      return { success: false, error: '予約が見つかりません' };
     }
 
-    // ② すでにキャンセル済みならスキップ
+    // ② すでにキャンセル済みなら何もしない
     if (reservation.status === 'canceled') {
-      console.log('⚠️ 既にキャンセル済み')
-      return { success: true, message: '既にキャンセルされています' }
+      console.log('⚠️ 既にキャンセル済み');
+      return { success: true, message: '既にキャンセルされています' };
     }
 
-    // ③ Googleカレンダーのイベント削除
-    if (reservation.calendar_event_id) {
+    // ✅ 車両ごとのカレンダーIDマップ（型定義）
+    const calendarMap: Record<VehicleKey, string> = {
+      car01: process.env.CAR01_CALENDAR_ID!,
+      car02: process.env.CAR02_CALENDAR_ID!,
+      car03: process.env.CAR03_CALENDAR_ID!,
+    };
+
+    // ✅ reservation.vehicle_id が 'car01' | 'car02' | 'car03' であることを保証
+    const vehicleKey = reservation.vehicle_id as VehicleKey;
+    const calendarId = calendarMap[vehicleKey];
+
+    // ③ Googleカレンダー削除（イベントIDがあれば）
+    if (calendarId && reservation.calendar_event_id) {
       try {
-        const auth = await getAccessToken()
-        const calendar = google.calendar({ version: 'v3', auth })
+        console.log(`📆 Googleカレンダー削除: ${reservation.calendar_event_id}`);
+        await deleteCalendarEvent(calendarId, reservation.calendar_event_id);
 
-        // ✅ 車ごとのカレンダーIDマップ
-        const calendarMap = {
-          car01: process.env.CAR01_CALENDAR_ID!,
-          car02: process.env.CAR02_CALENDAR_ID!,
-          car03: process.env.CAR03_CALENDAR_ID!,
-        }
+        // ✅ system_logsに削除成功を記録
+        await supabase.from('system_logs').insert([{
+          action: 'google-event-deleted',
+          reservation_id: reservationId,
+          details: { calendar_event_id: reservation.calendar_event_id }
+        }]);
 
-        const calendarId = calendarMap[reservation.vehicle_id as keyof typeof calendarMap]
-
-        if (calendarId) {
-          await calendar.events.delete({
-            calendarId,
-            eventId: reservation.calendar_event_id
-          })
-          console.log(`📆 Googleカレンダー削除完了: ${reservation.calendar_event_id}`)
-        }
       } catch (err) {
-        console.error('🔴 Googleカレンダー削除エラー:', err)
+        console.error('🔴 Googleカレンダー削除エラー:', err);
+        await supabase.from('system_logs').insert([{
+          action: 'google-event-delete-error',
+          reservation_id: reservationId,
+          details: String(err)
+        }]);
       }
     }
 
@@ -70,28 +79,25 @@ export async function cancelReservation(reservationId: string, reason: string = 
         status: 'canceled',
         payment_status: 'expired'
       })
-      .eq('id', reservationId)
+      .eq('id', reservationId);
 
     if (updateError) {
-      console.error('🔴 carrental 更新エラー:', updateError)
-      return { success: false, error: '予約のステータス更新に失敗しました' }
+      console.error('🔴 carrental 更新エラー:', updateError);
+      return { success: false, error: '予約のステータス更新に失敗しました' };
     }
 
-    // ⑤ system_logs に記録
-    await supabase.from('system_logs').insert([
-      {
-        action: reason,
-        reservation_id: reservationId,
-        details: { calendar_event_id: reservation.calendar_event_id },
-        created_at: new Date().toISOString()
-      }
-    ])
+    // ⑤ Supabase system_logs に記録
+    await supabase.from('system_logs').insert([{
+      action: reason,
+      reservation_id: reservationId,
+      details: { calendar_event_id: reservation.calendar_event_id }
+    }]);
 
-    console.log(`✅ キャンセル完了: ${reservationId}`)
-    return { success: true, message: 'キャンセル完了' }
+    console.log(`✅ キャンセル完了: ${reservationId}`);
+    return { success: true, message: 'キャンセル完了' };
 
   } catch (error) {
-    console.error('🔴 cancelReservation 処理エラー:', error)
-    return { success: false, error: String(error) }
+    console.error('🔴 cancelReservation 処理エラー:', error);
+    return { success: false, error: String(error) };
   }
 }
