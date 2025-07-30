@@ -5,7 +5,7 @@ import { cancelReservation } from '@/lib/cancelReservation'
 // ✅ Supabase クライアント（Service Role）
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!   // 🔥 anon → service role に変更
+  process.env.SUPABASE_SERVICE_ROLE_KEY!   // 🔥 service role を使って DB更新
 )
 
 export async function GET() {
@@ -53,12 +53,13 @@ export async function GET() {
         ])
 
         // ✅ cancelReservation（Googleカレンダー削除＋status更新＋system_logs記録）
+        //    🚩 cancelReservation 内も delete ではなく update に修正してある前提
         const res = await cancelReservation(reservation.id, 'auto-cancel')
         results.push({ id: reservation.id, ...res })
 
         console.log(`✅ キャンセル成功: ID=${reservation.id}`)
         await supabase.from('system_logs').insert([
-          { action: 'auto-cancel-success', reservation_id: reservation.id, details: 'キャンセル成功' }
+          { action: 'auto-cancel-success', reservation_id: reservation.id, details: 'status=canceled に更新' }
         ])
       } catch (err) {
         console.error(`❌ キャンセル失敗: ID=${reservation.id}`, err)
@@ -82,3 +83,4 @@ export async function GET() {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
+

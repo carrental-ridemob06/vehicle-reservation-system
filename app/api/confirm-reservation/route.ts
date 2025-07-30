@@ -168,6 +168,31 @@ export async function POST(req: NextRequest) {
       ])
       .select();
     console.log('📥 carrental Insert 結果:', carrentalData);
+const { data: systemLogData, error: systemLogError } = await supabase
+  .from('system_logs')
+  .insert([
+    {
+      action: 'reservation_created',
+      reservation_id: reservationId,
+      details: JSON.stringify({
+        vehicleId,
+        userId,
+        startDate,
+        endDate,
+        option_child_seat,
+        option_insurance,
+        total_price
+      }),
+      created_at: new Date().toISOString()
+    }
+  ]);
+
+console.log('🟢 system_logs 追加結果:', systemLogData);
+if (systemLogError) {
+  console.error('🔴 system_logs Insert Error:', systemLogError);
+}
+
+
 
     if (carrentalError) {
       console.error('🚨 carrental Insert Error:', carrentalError);
@@ -210,7 +235,7 @@ export async function POST(req: NextRequest) {
         image_url_1: car.image_url_1 || "",
         start_date: startDate,
         end_date: endDate,
-        planId: planLabel,
+        plan_id: planLabel,
         car_rental_price: plan_price,
         option_price_1: option_price_child_seat,
         option_price_2: option_price_insurance,
