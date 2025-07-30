@@ -1,54 +1,64 @@
+// lib/deleteCalendarEvent.ts
 import { google } from 'googleapis';
+import { getAccessToken } from './googleAuth';
 import { createClient } from '@supabase/supabase-js';
 
+// ✅ Supabase クライアント
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 /**
- * Googleカレンダーイベント削除（Supabaseにログ書き込み対応）
+ * Googleカレンダーのイベント削除 + system_logs記録
+ * @param calendarId GoogleカレンダーID
+ * @param eventId 削除するイベントID
  */
-export async function deleteCalendarEvent(calendarId: string, eventId: string, reservationId?: string) {
+export async function deleteCalendarEvent(calendarId: string, eventId: string) {
   try {
-    // ✅ Supabaseログ: 削除開始
+    // 🔵 削除開始ログ
     await supabase.from('system_logs').insert([
-      { action: 'google-event-delete-start', reservation_id: reservationId || null, details: `イベントID: ${eventId}` }
+      {
+        action: 'google-event-delete-start',
+        reservation_id: null, // 予約IDが渡せる場合は入れる
+        details: `削除開始: カレンダー=${calendarId}, イベントID=${eventId}`
+      }
     ]);
 
-    // ✅ サービスアカウントのJWTで認証
-    const auth = new google.auth.JWT({
-      email: process.env.GOOGLE_CLIENT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      scopes: ['https://www.googleapis.com/auth/calendar'],
-    });
-
-    // ✅ Calendar API を初期化
+    // 🔐 認証処理
+    const auth = await getAccessToken();
     const calendar = google.calendar({ version: 'v3', auth });
 
-    // ✅ Googleカレンダーイベント削除
+    // ✅ Google Calendar イベント削除
     await calendar.events.delete({
       calendarId,
       eventId,
     });
 
+    // 🟢 成功ログ
+    await supabase.from('system_logs').insert([
+      {
+        action: 'google-event-delete-success',
+        reservation_id: null,
+        details: `削除成功: イベントID=${eventId}`
+      }
+    ]);
+
     console.log(`✅ Googleカレンダーイベント削除成功: ${eventId}`);
-
-    // ✅ Supabaseログ: 削除成功
-    await supabase.from('system_logs').insert([
-      { action: 'google-event-delete-success', reservation_id: reservationId || null, details: `削除成功: ${eventId}` }
-    ]);
-
     return true;
-  } catch (err: any) {
-    console.error('❌ Googleカレンダーイベント削除エラー:', err);
 
-    // ✅ Supabaseログ: エラー記録
+  } catch (err: any) {
+    console.error('❌ Googleカレンダー削除エラー:', err);
+
+    // 🔴 失敗ログ（Google APIのレスポンス詳細も残す）
     await supabase.from('system_logs').insert([
-      { action: 'google-event-delete-error', reservation_id: reservationId || null, details: `エラー: ${err.message}` }
+      {
+        action: 'google-event-delete-error',
+        reservation_id: null,
+        details: `削除失敗: イベントID=${eventId} / エラー詳細: ${JSON.stringify(err.response?.data || err)}`
+      }
     ]);
 
-    // エラーを上位に投げる（処理は続行させる）
-    throw err;
+    return false; // throw せず false を返すことで処理は継続
   }
 }
