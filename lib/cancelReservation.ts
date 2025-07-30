@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { deleteCalendarEvent } from './deleteCalendarEvent';
 
+// ✅ Supabase クライアント（Service Role 使用）
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!   // ✅ anon ではなく service_role を使う
 );
 
 export async function cancelReservation(reservationId: string, reason: string = 'manual-cancel') {
@@ -20,7 +21,11 @@ export async function cancelReservation(reservationId: string, reason: string = 
     if (fetchError || !reservation) {
       console.error('🔴 carrental 取得エラー:', fetchError);
       await supabase.from('system_logs').insert([
-        { action: 'cancel-fetch-error', reservation_id: reservationId, details: fetchError?.message || '予約なし' }
+        { 
+          action: `${reason}-fetch-error`, 
+          reservation_id: reservationId, 
+          details: fetchError?.message || '予約が見つかりません' 
+        }
       ]);
       return { success: false, error: '予約が見つかりません' };
     }
@@ -28,7 +33,11 @@ export async function cancelReservation(reservationId: string, reason: string = 
     // ② 既にキャンセル済みならスキップ
     if (reservation.status === 'canceled') {
       await supabase.from('system_logs').insert([
-        { action: 'cancel-skip', reservation_id: reservationId, details: '既にキャンセル済み' }
+        { 
+          action: `${reason}-skip`, 
+          reservation_id: reservationId, 
+          details: '既にキャンセル済み' 
+        }
       ]);
       return { success: true, message: '既にキャンセルされています' };
     }
@@ -36,13 +45,16 @@ export async function cancelReservation(reservationId: string, reason: string = 
     // ③ Google カレンダー削除
     if (reservation.calendar_event_id) {
       try {
-        // ✅ 削除処理は deleteCalendarEvent.ts に一本化
         await deleteCalendarEvent(reservation.vehicle_id, reservation.calendar_event_id);
-        // ✅ 成功ログは deleteCalendarEvent.ts 内で処理するのでここでは書かない
+        // 成功ログは deleteCalendarEvent.ts 内で記録
       } catch (err) {
         console.error('🔴 Googleカレンダー削除エラー:', err);
         await supabase.from('system_logs').insert([
-          { action: 'google-event-delete-error', reservation_id: reservationId, details: String(err) }
+          { 
+            action: `${reason}-google-event-delete-error`, 
+            reservation_id: reservationId, 
+            details: String(err) 
+          }
         ]);
       }
     }
@@ -56,14 +68,22 @@ export async function cancelReservation(reservationId: string, reason: string = 
     if (updateError) {
       console.error('🔴 carrental 更新エラー:', updateError);
       await supabase.from('system_logs').insert([
-        { action: 'cancel-update-error', reservation_id: reservationId, details: updateError.message }
+        { 
+          action: `${reason}-update-error`, 
+          reservation_id: reservationId, 
+          details: updateError.message 
+        }
       ]);
       return { success: false, error: '予約のステータス更新に失敗しました' };
     }
 
-    // ✅ キャンセル完了ログ
+    // ✅ キャンセル完了ログ（auto/manual を分ける）
     await supabase.from('system_logs').insert([
-      { action: 'auto-cancel-success', reservation_id: reservationId, details: 'キャンセル成功' }
+      { 
+        action: `${reason}-success`, 
+        reservation_id: reservationId, 
+        details: 'キャンセル成功' 
+      }
     ]);
 
     console.log(`✅ キャンセル完了: ${reservationId}`);
@@ -72,7 +92,11 @@ export async function cancelReservation(reservationId: string, reason: string = 
   } catch (err) {
     console.error('🔴 cancelReservation 処理エラー:', err);
     await supabase.from('system_logs').insert([
-      { action: 'cancel-fatal-error', reservation_id: reservationId, details: String(err) }
+      { 
+        action: `${reason}-fatal-error`, 
+        reservation_id: reservationId, 
+        details: String(err) 
+      }
     ]);
     return { success: false, error: String(err) };
   }
