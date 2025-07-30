@@ -36,10 +36,9 @@ export async function cancelReservation(reservationId: string, reason: string = 
     // ③ Google カレンダー削除
     if (reservation.calendar_event_id) {
       try {
+        // ✅ 削除処理は deleteCalendarEvent.ts に一本化
         await deleteCalendarEvent(reservation.vehicle_id, reservation.calendar_event_id);
-        await supabase.from('system_logs').insert([
-          { action: 'google-event-deleted', reservation_id: reservationId, details: reservation.calendar_event_id }
-        ]);
+        // ✅ 成功ログは deleteCalendarEvent.ts 内で処理するのでここでは書かない
       } catch (err) {
         console.error('🔴 Googleカレンダー削除エラー:', err);
         await supabase.from('system_logs').insert([
@@ -62,6 +61,7 @@ export async function cancelReservation(reservationId: string, reason: string = 
       return { success: false, error: '予約のステータス更新に失敗しました' };
     }
 
+    // ✅ キャンセル完了ログ
     await supabase.from('system_logs').insert([
       { action: 'auto-cancel-success', reservation_id: reservationId, details: 'キャンセル成功' }
     ]);

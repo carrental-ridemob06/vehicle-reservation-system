@@ -1,44 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { google } from 'googleapis';
 import { cancelReservation } from '@/lib/cancelReservation';
-
-// ✅ Google Calendar イベント削除関数
-async function deleteCalendarEvent(vehicleId: string, calendarEventId: string) {
-  try {
-    // ✅ 車両ごとのカレンダーIDマップ
-    const calendarMap: Record<string, string> = {
-      car01: process.env.CAR01_CALENDAR_ID!,
-      car02: process.env.CAR02_CALENDAR_ID!,
-      car03: process.env.CAR03_CALENDAR_ID!,
-    };
-
-    const calendarId = calendarMap[vehicleId];
-    if (!calendarId) {
-      throw new Error(`❌ vehicleId=${vehicleId} のカレンダーIDが見つかりません`);
-    }
-
-    // ✅ Google認証（Service Account）
-    const auth = new google.auth.JWT({
-      email: process.env.GOOGLE_CLIENT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      scopes: ['https://www.googleapis.com/auth/calendar'],
-    });
-
-    const calendar = google.calendar({ version: 'v3', auth });
-
-    // ✅ イベント削除
-    await calendar.events.delete({
-      calendarId,
-      eventId: calendarEventId,
-    });
-
-    console.log(`✅ Googleカレンダー削除成功: ${calendarEventId} (vehicle=${vehicleId})`);
-    return { success: true };
-  } catch (error) {
-    console.error('🔴 Googleカレンダー削除失敗:', error);
-    return { success: false, error };
-  }
-}
+import { deleteCalendarEvent } from '@/lib/deleteCalendarEvent';  // ✅ libから呼び出しに一本化
 
 export async function POST(req: NextRequest) {
   try {
